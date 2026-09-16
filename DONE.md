@@ -16,7 +16,7 @@ w komunikacie commita, nie tutaj.
 
 ## v24–v25 — [archive/done-v24-v25.md](archive/done-v24-v25.md)
 
-- Most natywny w `mobile.html` dla powłoki Android (Capacitor): aparat, wibracje, Health Connect (25.2.0, 25.2.1)
+- Most natywny w `mobile.html` dla powłoki Android (Capacitor): aparat, wibracje, Health Connect (25.2.0–25.2.2)
 - Integracja ze Strava — dla użytkowników bez Garmina (25.0.0, e102d2f)
 - Prognoza doby: spoczynek z historii Garmina zamiast Mifflina (24.9.2)
 - Cel dnia z prognozy pełnej doby + roszady na „Dziś" (24.4.0 f0f7080, 24.5.0 1f4d59d, 24.6.0)

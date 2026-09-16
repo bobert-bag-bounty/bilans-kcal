@@ -6,12 +6,14 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
-## Most natywny w `mobile.html` dla powłoki Android (Capacitor) (25.2.0, 25.2.1)
+## Most natywny w `mobile.html` dla powłoki Android (Capacitor) (25.2.0–25.2.2)
 
 - **Kontekst:** `android-app/` (Capacitor) ładuje `https://fit.krasnal.cc/mobile`
   w WebView i wstrzykuje `window.Capacitor`. Cała obsługa siedzi w jednej
   sekcji „most natywny" w `mobile.html`; `NATIVE = false` w przeglądarce =
-  zero zmian w UI.
+  zero zmian w UI. Po POST → 303 → GET WebView gubi mostek, więc przy UA
+  `FitKrasnalApp` bez `window.Capacitor` strona raz się przeładowuje
+  (flaga w `sessionStorage`; też w `login.html`/`register.html`) (25.2.2).
 - **Zdjęcie:** w trybie natywnym `<input type=file>` znika, są przyciski
   „Zrób zdjęcie" / „Z galerii" (`Camera.getPhoto`, base64 → Blob jpeg,
   miniatura + „usuń"); `estimate()` wysyła ten Blob tym samym polem `photo`,
