@@ -6,6 +6,26 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
+## Most natywny w `mobile.html` dla powłoki Android (Capacitor) (25.2.0)
+
+- **Kontekst:** `android-app/` (Capacitor) ładuje `https://fit.krasnal.cc/mobile`
+  w WebView i wstrzykuje `window.Capacitor`. Cała obsługa siedzi w jednej
+  sekcji „most natywny" w `mobile.html`; `NATIVE = false` w przeglądarce =
+  zero zmian w UI.
+- **Zdjęcie:** w trybie natywnym `<input type=file>` znika, są przyciski
+  „Zrób zdjęcie" / „Z galerii" (`Camera.getPhoto`, base64 → Blob jpeg,
+  miniatura + „usuń"); `estimate()` wysyła ten Blob tym samym polem `photo`,
+  bez `downscale()`; `resetAddForm()` go czyści.
+- **Wibracje:** `Haptics.impact({style:'Light'})` po zapisie posiłku i wagi,
+  no-op bez pluginu. **Health Connect:** przycisk „Kroki z Health Connect"
+  w Krokach tylko gdy plugin istnieje; odczyt sumy kroków dnia → istniejący
+  `POST /api/day/{day}/steps`. Wywołania pluginu do weryfikacji (TODO w kodzie).
+- **Statystyki:** nowe zdarzenia `native_app_open` (raz przy starcie),
+  `photo_native_camera`, `photo_native_gallery`, `steps_health_connect`
+  w `usage.EVENTS` — widać na `/usage` w „top zdarzeń". Test w `test_usage.py`.
+- **Prywatność:** `privacy.html` bez zmian — zdjęcia idą do LLM pod istniejącą
+  zgodą, kroki to istniejące dane; żaden nowy odbiorca danych.
+
 ## Integracja ze Strava — dla użytkowników bez Garmina (25.0.0, e102d2f)
 
 **Implementacja:** Nowy provider Strava (`app/providers/strava.py`) z OAuth v3

@@ -206,6 +206,20 @@
     </div>
     <div id="add-llm-fields" style="display:none">
       <input type="file" id="f-photo" accept="image/*" capture="environment" onchange="track('photo_pick')">
+      <!-- Tryb natywny (Capacitor): zamiast <input type=file> dwa przyciski aparatu
+           + miniatura; pokazuje je initNative(), w przeglądarce zostają ukryte. -->
+      <div id="f-photo-native" style="display:none">
+        <div class="row2">
+          <button class="ghost" onclick="nativePhoto('CAMERA')">Zrób zdjęcie</button>
+          <button class="ghost" onclick="nativePhoto('PHOTOS')">Z galerii</button>
+        </div>
+        <div id="f-photo-preview" style="display:none;align-items:center;gap:10px;margin:4px 0">
+          <img id="f-photo-thumb" alt="wybrane zdjęcie"
+               style="width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--stone)">
+          <span class="muted">Zdjęcie gotowe do szacowania</span>
+          <a href="#" class="muted" onclick="clearNativePhoto();return false" style="margin-left:auto">usuń</a>
+        </div>
+      </div>
       <input type="text" id="f-note" placeholder="uwaga do zdjęcia (opcjonalnie)">
       <textarea id="f-desc" rows="2" placeholder="albo opisz posiłek: 2 jajka sadzone i kromka żytniego"></textarea>
       <button class="primary" onclick="estimate()">Szacuj</button>
@@ -286,6 +300,9 @@
         <p class="muted" id="a-steps-sync-note" style="font-size:11px;margin:4px 0 0">Synchronizacja z Garminem nadpisze tę wartość.</p>
       </div>
       <button class="primary sm" onclick="saveActivitySteps()" style="width:auto;margin-top:4px">Zapisz kroki</button>
+      <!-- Tylko powłoka Android z pluginem HealthConnect (initNative) -->
+      <button class="ghost sm" id="a-hc-btn" onclick="stepsFromHealthConnect()" style="display:none;width:auto">Kroki z Health Connect</button>
+      <p class="muted" id="a-hc-status" style="font-size:11px;margin:0"></p>
     </div>
   </section>
 
@@ -665,6 +682,108 @@ function track(event) {
   }).catch(() => {});
 }
 
+/* ── most natywny (Capacitor — powłoka Android w android-app/) ──
+   W zwykłej przeglądarce NATIVE = false i ta sekcja nic nie zmienia w UI.
+   W powłoce Capacitor wstrzykuje do strony `window.Capacitor`; pluginy
+   bierzemy przez `window.Capacitor.Plugins.<Nazwa>` (Camera, Haptics, App,
+   StatusBar, opcjonalnie HealthConnect z capacitor-health-connect — może go
+   nie być, stąd feature-check przy każdym użyciu). Wszystko tu jest
+   opcjonalne: brak pluginu = brak przycisku/efektu, nigdy wyjątek na ekranie. */
+const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const nativePlugin = (name) =>
+  (NATIVE && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
+
+let _nativePhoto = null;   // Blob image/jpeg z Camera.getPhoto — zastępuje <input type=file>
+
+function base64ToBlob(b64, mime) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], {type: mime});
+}
+
+async function nativePhoto(source) {   // source: "CAMERA" | "PHOTOS"
+  const Camera = nativePlugin("Camera");
+  const msg = document.getElementById("msg");
+  if (!Camera) { msg.textContent = "Aparat jest niedostępny w tej wersji aplikacji."; return; }
+  try {
+    const photo = await Camera.getPhoto({resultType: "base64", source, quality: 80, width: 1280});
+    if (!photo || !photo.base64String) return;
+    clearNativePhoto();
+    _nativePhoto = base64ToBlob(photo.base64String, "image/jpeg");
+    const thumb = document.getElementById("f-photo-thumb");
+    thumb.src = URL.createObjectURL(_nativePhoto);
+    document.getElementById("f-photo-preview").style.display = "flex";
+    msg.textContent = "";
+    track(source === "CAMERA" ? "photo_native_camera" : "photo_native_gallery");
+  } catch (e) {
+    // Anulowanie aparatu/galerii też kończy się wyjątkiem — to nie jest błąd.
+    if (!/cancel/i.test(String(e && e.message))) {
+      msg.textContent = "Nie udało się pobrać zdjęcia: " + (e && e.message || e);
+    }
+  }
+}
+
+function clearNativePhoto() {
+  _nativePhoto = null;
+  const thumb = document.getElementById("f-photo-thumb");
+  if (thumb.src && thumb.src.startsWith("blob:")) URL.revokeObjectURL(thumb.src);
+  thumb.removeAttribute("src");
+  document.getElementById("f-photo-preview").style.display = "none";
+}
+
+async function haptic() {
+  // Lekki impuls po udanym zapisie; w przeglądarce no-op.
+  const Haptics = nativePlugin("Haptics");
+  if (!Haptics) return;
+  try { await Haptics.impact({style: "Light"}); } catch (e) { /* brak wibracji to nie błąd */ }
+}
+
+async function stepsFromHealthConnect() {
+  const HC = nativePlugin("HealthConnect");
+  const status = document.getElementById("a-hc-status");
+  if (!HC) return;
+  const day = document.getElementById("t-date").value || todayIso();
+  status.textContent = "Odczyt z Health Connect…";
+  try {
+    // TODO(android): zweryfikować z zainstalowaną wersją capacitor-health-connect:
+    //   HealthConnect.checkAvailability() → {availability: "Available" | ...}
+    //   HealthConnect.requestHealthPermissions({read: ["Steps"], write: []})
+    //   HealthConnect.readRecords({type: "Steps", timeRangeFilter: {type: "between",
+    //       startTime: Date, endTime: Date}}) → {records: [{count, startTime, endTime}]}
+    if (typeof HC.checkAvailability === "function") {
+      const a = await HC.checkAvailability();
+      if (a && a.availability && a.availability !== "Available") {
+        throw new Error("Health Connect niedostępny (" + a.availability + ")");
+      }
+    }
+    await HC.requestHealthPermissions({read: ["Steps"], write: []});
+    const res = await HC.readRecords({
+      type: "Steps",
+      timeRangeFilter: {type: "between",
+        startTime: new Date(day + "T00:00:00"), endTime: new Date(day + "T23:59:59.999")},
+    });
+    const total = ((res && res.records) || []).reduce((sum, r) => sum + (+r.count || 0), 0);
+    if (!total) { status.textContent = "Health Connect nie ma kroków dla tego dnia."; return; }
+    await apiJson(`/api/day/${day}/steps`, {steps: total});
+    track("steps_health_connect");
+    status.textContent = `Zapisano ${total} kroków z Health Connect (${day}).`;
+    await renderToday();
+    showLoadingInActivityList();
+    loadActivityList(day);
+  } catch (e) {
+    status.textContent = "Nie udało się pobrać kroków: " + (e && e.message || e);
+  }
+}
+
+function initNative() {
+  if (!NATIVE) return;
+  document.getElementById("f-photo").style.display = "none";
+  document.getElementById("f-photo-native").style.display = "";
+  if (nativePlugin("HealthConnect")) document.getElementById("a-hc-btn").style.display = "";
+  track("native_app_open");   // adopcja powłoki Android na /usage
+}
+
 /* ── nawigacja ── */
 function goToday() {
   show('today');
@@ -968,6 +1087,7 @@ async function saveWeighIn() {
   }
   try {
     await apiJson("/api/weight", {date: day, weight_kg: v});
+    haptic();
     _prefilledWeight = v;   // pole zostaje z zapisaną wartością jako nowa podstawa
     if (status) krasnalSays(status, `${KRASNAL_STATUS.weightSaved} ${v} kg (${day})`);
     renderToday();
@@ -980,7 +1100,7 @@ async function saveWeighIn() {
 async function estimate() {
   refreshMealWhen();
   const msg = document.getElementById("msg");
-  const file = document.getElementById("f-photo").files[0];
+  const file = document.getElementById("f-photo").files[0] || _nativePhoto;
   const desc = document.getElementById("f-desc").value.trim();
   if (!file && !desc) { msg.textContent = "Dodaj zdjęcie albo opis."; return; }
   krasnalSays(msg, KRASNAL_STATUS.estimating);
@@ -989,7 +1109,11 @@ async function estimate() {
     if (file) {
       const fd = new FormData();
       let blob;
-      try { blob = await downscale(file); } catch(e) { blob = file; }
+      if (file === _nativePhoto) {
+        blob = file;   // Camera.getPhoto już zmniejszyło do 1280 px / jpeg 80
+      } else {
+        try { blob = await downscale(file); } catch(e) { blob = file; }
+      }
       fd.append("photo", blob, "photo.jpg");
       if (document.getElementById("f-note").value.trim()) fd.append("note", document.getElementById("f-note").value.trim());
       const day = document.getElementById("f-date").value;
@@ -1015,6 +1139,7 @@ function resetAddForm() {
   // Dane trafiły już do draftu/kolejki — pola wejściowe formularza "Dodaj"
   // nie muszą (i nie powinny) dalej stać wypełnione po udanym szacowaniu.
   document.getElementById("f-photo").value = "";
+  clearNativePhoto();
   document.getElementById("f-desc").value = "";
   document.getElementById("f-note").value = "";
   _mealWhenAuto = true;  // koniec tego posiłku — kolejny znów zaczyna od "teraz"
@@ -1151,8 +1276,9 @@ async function saveDraft() {
     sugars_g: +document.getElementById("d-sugars").value,
     items: _manual ? [] : (draft?.items || []),
     assumptions: _manual ? [] : (draft?.assumptions || []),
-    source: _manual ? "manual" : (document.getElementById("f-photo").files[0] ? "photo" : "text"),
+    source: _manual ? "manual" : ((document.getElementById("f-photo").files[0] || _nativePhoto) ? "photo" : "text"),
   });
+  haptic();
   draft = null;
   _manual = false;
   document.getElementById("draft").style.display = "none";
@@ -1583,6 +1709,7 @@ async function deleteActivity(id, callback) {
 
 /* ── init ── */
 document.getElementById("t-date").value = todayIso();
+initNative();
 show("today");
 renderToday();
 api("/api/settings").then(settings => {

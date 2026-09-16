@@ -49,6 +49,8 @@ EVENTS: set[str] = {
     "tab_today", "tab_add", "tab_activities", "tab_trends", "tab_settings",
     "manual_open", "saved_meals_open", "photo_pick",
     "calibration_step", "calibration_reset", "calibration_error",
+    # powłoka Android (Capacitor) — adopcja i użycie mostka natywnego
+    "native_app_open", "photo_native_camera", "photo_native_gallery", "steps_health_connect",
 }
 
 MEAL_SAVE_EVENTS = {"meal_save_photo", "meal_save_text", "meal_save_manual", "meal_save_saved"}
