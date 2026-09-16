@@ -16,6 +16,7 @@ w komunikacie commita, nie tutaj.
 
 ## v24–v25 — [archive/done-v24-v25.md](archive/done-v24-v25.md)
 
+- Utwardzenie publicznych interfejsów: nagłówki + CSP, CSRF po origin, filtr Host, limit zdjęcia 8 MB (25.5.0)
 - Gemini przez Vertex AI z konta serwera (backend `vertex`, bez kluczy API) (25.4.0)
 - Logowanie przez Google (OIDC, authlib) z allowlistą e-maili — wariant GCP dla jednego testera (25.3.0)
 - Most natywny w `mobile.html` dla powłoki Android (Capacitor): aparat, wibracje, Health Connect (25.2.0–25.2.2)

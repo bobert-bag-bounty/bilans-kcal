@@ -63,7 +63,17 @@ VERTEX_LOCATION = os.getenv("FIT_KRASNAL_VERTEX_LOCATION", "europe-west1")
 VISION_MODEL = os.getenv("FIT_KRASNAL_VISION_MODEL", "claude-opus-5")
 GEMINI_MODEL = os.getenv("FIT_KRASNAL_GEMINI_MODEL", "gemini-3.5-flash")
 
-MAX_PHOTO_BYTES = 15 * 1024 * 1024
+# Limit zdjęcia posiłku; middleware odrzuca po Content-Length, endpoint czyta
+# najwyżej tyle+1 (Camera.getPhoto w powłoce daje ~200–400 kB, 8 MB to zapas).
+MAX_PHOTO_BYTES = 8 * 1024 * 1024
+# Ciasteczko sesji: 14 dni (tester nie loguje się codziennie), potem ponowne logowanie.
+SESSION_MAX_AGE_S = 14 * 24 * 3600
+
+# Nagłówek Host, jaki akceptujemy (TrustedHostMiddleware) — lista po przecinku.
+# Nieustawione = "*" (dev i testy). Produkcja: własna domena, np. fit-<ip>.sslip.io.
+ALLOWED_HOSTS = [
+    h.strip() for h in os.getenv("FIT_KRASNAL_ALLOWED_HOSTS", "*").split(",") if h.strip()
+] or ["*"]
 
 # Pseudonimizacja statystyk użycia (plan „Statystyki użycia") — sól HMAC do
 # hashowania user_id na pseudonim w tabeli UsageDaily. Stała: zmiana zrywa

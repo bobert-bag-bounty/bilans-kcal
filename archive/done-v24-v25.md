@@ -6,6 +6,28 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
+## Utwardzenie publicznych interfejsów (25.5.0)
+
+- **`app/middleware.py`** (czyste ASGI, bez nowych frameworków), wpinane przez
+  `main.install_hardening()` — ta sama funkcja buduje stos w testach
+  (`tests/test_hardening.py`).
+- **Nagłówki:** `X-Content-Type-Options: nosniff`, `Referrer-Policy:
+  same-origin`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(self),
+  geolocation=()`, HSTS rok + subdomeny tylko poza DEBUG, CSP `default-src
+  'self'` z `'unsafe-inline'` dla skryptów/stylów (cały JS siedzi w
+  szablonach), `form-action 'self' https://accounts.google.com`. Szablony nie
+  ładują nic z CDN, więc nic więcej nie trzeba było otwierać.
+- **CSRF:** żądania nie-GET/HEAD/OPTIONS z `Sec-Fetch-Site` innym niż
+  `same-origin`/`none` albo z `Origin`/`Referer` o innym hoście niż `Host` →
+  403 JSON. Bez tych nagłówków (curl, testy) przepuszczamy — sesja jest i tak
+  `SameSite=Lax`. Powłoka Android ładuje stronę z hosta API, więc przechodzi.
+- **Host i sesja:** `TrustedHostMiddleware` z `FIT_KRASNAL_ALLOWED_HOSTS`
+  (domyślnie `*`); ciasteczko sesji jawnie `max_age` 14 dni, dalej
+  `https_only=not DEBUG`, `SameSite=Lax`.
+- **Zdjęcie:** limit 15 → 8 MB; `BodyLimitMiddleware` odrzuca po
+  `Content-Length` zanim multipart zostanie wczytany, a endpoint czyta
+  najwyżej limit+1 bajtów.
+
 ## Gemini przez Vertex AI z konta serwera (backend `vertex`) (25.4.0)
 
 - **Po co:** VM na GCP ma konto usługi z `roles/aiplatform.user` — Gemini
