@@ -26,3 +26,11 @@ output "env_hints" {
     OAUTH_REDIRECT_URI          = "https://${var.domain}/auth/google/callback"
   }
 }
+
+output "apk_download_url" {
+  value = "https://storage.cloud.google.com/${google_storage_bucket.apk.name}/fit-krasnal.apk"
+}
+
+output "apk_upload_command" {
+  value = "gcloud storage cp android-app/dist/fit-krasnal-debug.apk gs://${google_storage_bucket.apk.name}/fit-krasnal.apk"
+}

@@ -19,8 +19,20 @@ variable "domain" {
 }
 
 variable "allowed_emails" {
-  description = "Lista e-maili dopuszczonych do logowania (FIT_KRASNAL_ALLOWED_EMAILS). Tylko do outputu/dokumentacji — trafia do /etc/fit-krasnal/env ręcznie."
+  description = "E-maile dopuszczone do logowania. Trafiają do metadanych VM (klucz fit-krasnal-allowed-emails), skąd usługa czyta je przy starcie (deploy/fetch-metadata-env.sh → FIT_KRASNAL_ALLOWED_EMAILS)."
   type        = list(string)
+}
+
+variable "apk_bucket_name" {
+  description = "Nazwa bucketu GCS na plik APK (globalnie unikalna). Prywatny; dostęp przez storage.cloud.google.com po zalogowaniu."
+  type        = string
+  default     = "fit-krasnal-apk"
+}
+
+variable "apk_viewers" {
+  description = "Konta Google (adresy e-mail) z prawem odczytu bucketu APK. Nic więcej nie dostają."
+  type        = list(string)
+  default     = []
 }
 
 variable "name" {

@@ -16,6 +16,7 @@ locals {
     "oslogin.googleapis.com",
     "secretmanager.googleapis.com",
     "logging.googleapis.com",
+    "storage.googleapis.com",
   ]
 }
 
@@ -113,6 +114,13 @@ resource "google_compute_instance" "vm" {
 
   metadata = {
     enable-oslogin = "TRUE"
+    # Allowlista logowania — jedno źródło prawdy w GCP. Usługa czyta ją przy
+    # każdym starcie (ExecStartPre). Dopisanie usera bez Terraforma:
+    #   gcloud compute instances add-metadata fit-krasnal --zone <zone> \
+    #     --metadata fit-krasnal-allowed-emails=a@x.com,b@y.com
+    #   (potem systemctl restart fit-krasnal) — i uzupełnij tfvars, żeby plan
+    #   nie pokazał dryfu.
+    fit-krasnal-allowed-emails = join(",", var.allowed_emails)
   }
 
   shielded_instance_config {
@@ -124,4 +132,25 @@ resource "google_compute_instance" "vm" {
   allow_stopping_for_update = true
 
   depends_on = [google_project_service.apis]
+}
+
+# ── Bucket na APK: prywatny, dostęp tylko dla wskazanych kont ───────────
+# Pobieranie: https://storage.cloud.google.com/<bucket>/fit-krasnal.apk
+# (wymaga zalogowania kontem Google z listy apk_viewers).
+resource "google_storage_bucket" "apk" {
+  name                        = var.apk_bucket_name
+  location                    = upper(var.region)
+  storage_class               = "STANDARD"
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = false
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_storage_bucket_iam_member" "apk_viewers" {
+  for_each = toset(var.apk_viewers)
+  bucket   = google_storage_bucket.apk.name
+  role     = "roles/storage.objectViewer"
+  member   = "user:${each.value}"
 }

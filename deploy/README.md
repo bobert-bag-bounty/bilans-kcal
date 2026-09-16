@@ -56,6 +56,36 @@ Ekran zgody OAuth i klient OAuth (Web application, origin
 `https://<FIT_DOMAIN>`, redirect `https://<FIT_DOMAIN>/auth/google/callback`)
 powstają ręcznie w Console i nie są w Terraformie.
 
+### Allowlista logowania w metadanych VM
+
+Lista e-maili dopuszczonych do logowania (`FIT_KRASNAL_ALLOWED_EMAILS`)
+**nie** mieszka w `/etc/fit-krasnal/env`, tylko w metadanych instancji
+(klucz `fit-krasnal-allowed-emails`, zmienna `allowed_emails` w Terraformie).
+Unit `fit-krasnal.service` woła przed startem `deploy/fetch-metadata-env.sh`,
+który przepisuje ją do `/run/fit-krasnal/env` (drugi `EnvironmentFile`,
+nadpisuje `/etc`). Dodanie testera bez Terraforma:
+
+```bash
+gcloud compute instances add-metadata fit-krasnal --zone <zone> \
+  --metadata fit-krasnal-allowed-emails=a@example.com,b@example.com
+gcloud compute ssh fit-krasnal --zone <zone> --tunnel-through-iap -- sudo systemctl restart fit-krasnal
+```
+
+Potem dopisz ten sam e-mail do `allowed_emails` w tfvars, inaczej następny
+`terraform plan` pokaże dryf i `apply` go cofnie.
+
+### Bucket na APK
+
+`google_storage_bucket.apk` (domyślnie `fit-krasnal-apk`): prywatny,
+`uniform_bucket_level_access`, `public_access_prevention = enforced`,
+`roles/storage.objectViewer` tylko dla kont z `apk_viewers` — nic więcej.
+Wgranie i link do pobrania (wymaga zalogowania kontem z listy):
+
+```bash
+gcloud storage cp android-app/dist/fit-krasnal-debug.apk gs://<bucket>/fit-krasnal.apk
+# https://storage.cloud.google.com/<bucket>/fit-krasnal.apk
+```
+
 ## 1. Bootstrap maszyny (raz)
 
 Po SSH na VM (skrypt jest idempotentny, można go powtarzać):
