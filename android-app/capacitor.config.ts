@@ -18,6 +18,9 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: isHttp,
+    // Marker w UA: strona wykrywa powłokę nawet gdy most nie został wstrzyknięty
+    // (nawigacja po POST, np. logowanie) i przeładowuje się przez GET.
+    appendUserAgent: 'FitKrasnalApp/1',
   },
   plugins: {
     StatusBar: {

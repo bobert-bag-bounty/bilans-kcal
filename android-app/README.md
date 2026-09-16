@@ -56,6 +56,23 @@ Minimalny Android: **8.0 (API 26)** — wymaga tego biblioteka Health Connect.
 Identyfikator aplikacji: `cc.krasnal.fit`. Ikona launchera pochodzi
 z `app/static/icon-512.png`.
 
+## Most Capacitora a nawigacja po POST
+
+Powłoka wstrzykuje `window.Capacitor` tylko przy ładowaniu dokumentu przez GET.
+Po wysłaniu formularza (logowanie, rejestracja, wylogowanie → 303 → GET) strona
+ładuje się bez mostka. Dlatego powłoka dokleja do User-Agent `FitKrasnalApp/1`,
+a `mobile.html`, `login.html` i `register.html` przeładowują się jednorazowo,
+gdy widzą ten marker bez `window.Capacitor` (od wersji 25.2.2 backendu).
+
+## Test na urządzeniu (bez logowania w GUI)
+
+W buildzie debug WebView jest debugowalny. Po `adb reverse tcp:8000 tcp:8000`
+i buildzie z `FIT_KRASNAL_APP_URL=http://localhost:8000` można sterować stroną
+przez Chrome DevTools Protocol (`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`).
+Sprawdzone w ten sposób: wstrzyknięcie mostka, przyciski aparatu/galerii,
+`HealthPlugin.isHealthAvailable()` → `true` przy zainstalowanym Health Connect,
+start intencji aparatu i dialogu uprawnień Health Connect.
+
 ## Tylko PoC — czego tu nie ma
 
 - Brak podpisu release (tylko `assembleDebug`); brak Play Store.
