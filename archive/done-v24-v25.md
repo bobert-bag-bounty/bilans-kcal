@@ -6,6 +6,29 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
+## Logowanie przez Google (OIDC, authlib) z allowlistą e-maili (25.3.0)
+
+- **Kontekst:** fork dla jednego testera na własnym projekcie GCP, bez kodu
+  zaproszenia. `FIT_KRASNAL_AUTH` = `password` (domyślnie, jak dotąd) | `oidc`
+  | `both`; `FIT_KRASNAL_GOOGLE_CLIENT_ID/_SECRET`, `FIT_KRASNAL_ALLOWED_EMAILS`,
+  `FIT_KRASNAL_PUBLIC_URL` (adres zwrotny `<PUBLIC_URL>/auth/google/callback`).
+- **Router `app/routers/oidc.py`:** `GET /auth/google` (authorization code +
+  PKCE S256, `state`/`nonce` w sesji przez authlib), `GET /auth/google/callback`
+  (ID token weryfikuje authlib: issuer, audience, exp, nonce; wymagany
+  `email_verified`). E-mail spoza allowlisty → 403 „Konto nieuprawnione", nic
+  nie powstaje.
+- **Konto:** nowa kolumna `User.google_sub` (migracja addytywna + unikalny
+  indeks); dopasowanie najpierw po `sub`, potem po e-mailu (stare konto
+  z hasłem dostaje `sub`). Konto z Google ma `password_hash=None` i nigdy nie
+  wchodzi hasłem. W trybie `oidc` `POST /login` i oba `/register` → 404,
+  `/login` pokazuje tylko „Zaloguj przez Google".
+- **Statystyki:** zdarzenie `login_google` w `usage.EVENTS` (obok `login`),
+  widoczne na `/usage`. Testy `tests/test_oidc.py` z atrapą klienta authlib.
+- **Prywatność:** `/prywatnosc` — nowy odbiorca (Google: e-mail i identyfikator
+  konta przy logowaniu), `PRIVACY_VERSION` → 2026-09-16 (ponowna zgoda).
+  `deploy/README.md` — sekcja „Wariant GCP z logowaniem Google" bez realnych
+  wartości.
+
 ## Most natywny w `mobile.html` dla powłoki Android (Capacitor) (25.2.0–25.2.2)
 
 - **Kontekst:** `android-app/` (Capacitor) ładuje `https://fit.krasnal.cc/mobile`

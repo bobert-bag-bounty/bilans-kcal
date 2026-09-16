@@ -145,6 +145,26 @@ starego klucza (zgodnie z wypisanym środowiskiem `EnvironmentFile`), a baza
 ma już sekrety zaszyfrowane nowym — restart jest częścią rotacji, nie
 opcjonalnym krokiem.
 
+## Wariant GCP z logowaniem Google
+
+Fork dla jednego testera na własnym projekcie GCP: zamiast kodu zaproszenia
+i hasła — logowanie kontem Google (OIDC) z allowlistą adresów. Żadnych
+wartości nie ma w repo, wszystko przez zmienne środowiskowe w
+`/etc/fit-krasnal/env`:
+
+| Zmienna | Znaczenie |
+|---|---|
+| `FIT_KRASNAL_PUBLIC_URL` | publiczny adres aplikacji, np. `https://fit-<ip>.sslip.io` |
+| `FIT_KRASNAL_AUTH` | `oidc` (tylko Google) albo `both` (Google + hasło) |
+| `FIT_KRASNAL_GOOGLE_CLIENT_ID` / `_SECRET` | klient OAuth 2.0 „Web application" z Google Cloud Console |
+| `FIT_KRASNAL_ALLOWED_EMAILS` | lista e-maili (małe litery, po przecinku), którym wolno się zalogować |
+| `FIT_KRASNAL_ALLOWED_HOSTS` | lista hostów akceptowanych w nagłówku `Host` (domyślnie `*`) |
+| `FIT_KRASNAL_VERTEX_PROJECT` / `_LOCATION` | Gemini przez Vertex AI z konta serwera (ADC), bez kluczy API; region domyślnie `europe-west1` |
+
+W konsoli Google (APIs & Services → Credentials) adres zwrotny (redirect URI)
+klienta musi być dokładnie `<FIT_KRASNAL_PUBLIC_URL>/auth/google/callback`.
+Konto usługi VM potrzebuje roli `roles/aiplatform.user`, jeśli używasz Vertex AI.
+
 ## Onboarding testera
 
 1. Wejdź na `https://fit.krasnal.cc` (przez basic_auth Caddy, dopóki nie

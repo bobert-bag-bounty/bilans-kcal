@@ -9,7 +9,7 @@ from .config import DEBUG, DEV_SECRET_KEY, ENC_KEY, SECRET_KEY, USAGE_SALT, ensu
 from .db import get_session, init_db
 from .deps import STATIC_DIR
 from .providers import garmin as garmin_provider
-from .routers import (auth as auth_router, dashboard, day, meals, profile, pwa,
+from .routers import (auth as auth_router, dashboard, day, meals, oidc, profile, pwa,
                       settings, transfer, trends, usage)
 from .services import crypto, meal_queue
 
@@ -23,6 +23,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 app.include_router(auth_router.router)
+app.include_router(oidc.router)
 app.include_router(profile.router)
 app.include_router(day.router)
 app.include_router(meals.router)
