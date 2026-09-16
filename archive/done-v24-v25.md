@@ -6,6 +6,25 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
+## Gemini przez Vertex AI z konta serwera (backend `vertex`) (25.4.0)
+
+- **Po co:** VM na GCP ma konto usługi z `roles/aiplatform.user` — Gemini
+  wołany przez Vertex AI z Application Default Credentials, bez kluczy API
+  użytkownika ani operatora.
+- **Wybór backendu (`meal_vision.pick_backend`):** `FIT_KRASNAL_LLM` =
+  `auto|claude|gemini|vertex`; w `auto`: klucz Gemini usera → `gemini`,
+  inaczej `vertex` gdy jest `FIT_KRASNAL_VERTEX_PROJECT`, inaczej klucz z env,
+  inaczej `claude`. `llm_configured()` w vertex zwraca True bez klucza.
+- **Klient:** `gemini_client(backend, key)` → `genai.Client(vertexai=True,
+  project=…, location=FIT_KRASNAL_VERTEX_LOCATION lub "europe-west1")` albo
+  `genai.Client(api_key=…)`; `_estimate_gemini` przyjmuje `client` (testy
+  z atrapą, bez sieci).
+- **UI:** `/settings` i zakładka Ustawienia w `mobile.html` chowają pole klucza
+  Gemini i pokazują „Szacowanie działa przez konto serwera (Vertex AI)".
+- **Prywatność:** `/prywatnosc` — nowy odbiorca Google Cloud Vertex AI
+  (zdjęcia/opisy posiłków, region UE, tylko gdy operator włączy tryb vertex);
+  wersja noty podniesiona już w 25.3.0 (2026-09-16).
+
 ## Logowanie przez Google (OIDC, authlib) z allowlistą e-maili (25.3.0)
 
 - **Kontekst:** fork dla jednego testera na własnym projekcie GCP, bez kodu

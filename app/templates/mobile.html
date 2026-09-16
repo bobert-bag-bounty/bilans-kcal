@@ -1424,7 +1424,12 @@ async function renderSettings() {
     }
     document.getElementById("s-gemini-masked").textContent = settings.gemini_masked || "—";
     document.getElementById("s-llm-status").textContent =
-      settings.backend ? `backend: ${settings.backend}` : "brak klucza";
+      settings.backend === "vertex" ? "Szacowanie działa przez konto serwera (Vertex AI)"
+      : settings.backend ? `backend: ${settings.backend}` : "brak klucza";
+    // Vertex AI (konto serwera): pole klucza nie ma sensu — chowamy je.
+    const vertex = settings.backend === "vertex";
+    document.getElementById("s-gemini-key").style.display = vertex ? "none" : "";
+    document.getElementById("s-llm-btn").style.display = vertex ? "none" : "";
     document.getElementById("s-garmin-status").textContent =
       settings.garmin_connected ? "Połączony ✓" : "Niepołączony";
     const stravaEl = document.getElementById("strava-status");

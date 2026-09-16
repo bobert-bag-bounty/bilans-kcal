@@ -52,9 +52,14 @@ INVITE_CODE = os.getenv("FIT_KRASNAL_INVITE_CODE", "")
 #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ENC_KEY = os.getenv("FIT_KRASNAL_ENC_KEY")
 
-# Backend LLM do szacowania posiłków: auto | claude | gemini
-# auto = gemini, jeśli jest GEMINI_API_KEY/GOOGLE_API_KEY; w przeciwnym razie claude.
+# Backend LLM do szacowania posiłków: auto | claude | gemini | vertex
+# auto = gemini przy kluczu użytkownika; inaczej vertex, gdy jest
+# FIT_KRASNAL_VERTEX_PROJECT; inaczej gemini z klucza w env; inaczej claude.
+# vertex = Gemini przez Vertex AI z Application Default Credentials konta
+# serwera (rola roles/aiplatform.user) — bez żadnych kluczy API.
 LLM_BACKEND = os.getenv("FIT_KRASNAL_LLM", "auto")
+VERTEX_PROJECT = os.getenv("FIT_KRASNAL_VERTEX_PROJECT")
+VERTEX_LOCATION = os.getenv("FIT_KRASNAL_VERTEX_LOCATION", "europe-west1")
 VISION_MODEL = os.getenv("FIT_KRASNAL_VISION_MODEL", "claude-opus-5")
 GEMINI_MODEL = os.getenv("FIT_KRASNAL_GEMINI_MODEL", "gemini-3.5-flash")
 

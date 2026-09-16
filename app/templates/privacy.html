@@ -96,7 +96,8 @@ bo skala pilota tego nie wymaga. Jeśli coś jest niejasne, napisz:
 <h2 id="llm">Zdjęcia i opisy posiłków — wysyłka do zewnętrznego modelu (LLM)</h2>
 <p>Żeby oszacować kalorie ze zdjęcia albo opisu, aplikacja wysyła je do
 zewnętrznego modelu językowego — <b>Google Gemini</b> albo <b>Anthropic
-Claude</b>, w zależności od tego, jaki klucz API wkleisz w Ustawieniach.
+Claude</b>, w zależności od tego, jaki klucz API wkleisz w Ustawieniach
+(albo do Gemini przez Vertex AI z konta serwera — patrz niżej).
 To jedyne miejsce, gdzie Twoje dane wychodzą poza tę aplikację. Bez Twojej
 wyraźnej zgody (przełącznik w Ustawieniach) ta ścieżka jest wyłączona —
 możesz zamiast tego wpisywać wartości ręcznie albo korzystać z „moich
@@ -122,6 +123,13 @@ przez konto administratora. Co ważne dla oceny ryzyka:</p>
     Jeżeli korzystasz z aplikacji spoza tego regionu, sprawdź te warunki
     dla swojej lokalizacji.</li>
 </ul>
+<p><b>Wariant „Vertex AI" (tylko jeśli operator instancji go włączył):</b>
+zamiast Twojego klucza zdjęcia i opisy posiłków idą do modelu Gemini przez
+<b>Google Cloud Vertex AI</b> z konta serwera, w regionie w Unii Europejskiej.
+Google Cloud przetwarza je jako podwykonawca operatora i zgodnie z warunkami
+Vertex AI nie używa ich do trenowania modeli. W Ustawieniach zobaczysz wtedy
+informację „Szacowanie działa przez konto serwera (Vertex AI)" zamiast pola
+na klucz. Zgoda (przełącznik w Ustawieniach) obowiązuje tak samo.</p>
 <p class="muted">Te ustalenia mogą się zmienić — jeśli dostawcy zmienią
 zasady, postaramy się zaktualizować tę notę i podniesiemy jej wersję (co poprosi
 ponownie o zgodę).</p>
