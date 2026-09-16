@@ -300,7 +300,7 @@
         <p class="muted" id="a-steps-sync-note" style="font-size:11px;margin:4px 0 0">Synchronizacja z Garminem nadpisze tę wartość.</p>
       </div>
       <button class="primary sm" onclick="saveActivitySteps()" style="width:auto;margin-top:4px">Zapisz kroki</button>
-      <!-- Tylko powłoka Android z pluginem HealthConnect (initNative) -->
+      <!-- Tylko powłoka Android z pluginem HealthPlugin / capacitor-health (initNative) -->
       <button class="ghost sm" id="a-hc-btn" onclick="stepsFromHealthConnect()" style="display:none;width:auto">Kroki z Health Connect</button>
       <p class="muted" id="a-hc-status" style="font-size:11px;margin:0"></p>
     </div>
@@ -686,8 +686,8 @@ function track(event) {
    W zwykłej przeglądarce NATIVE = false i ta sekcja nic nie zmienia w UI.
    W powłoce Capacitor wstrzykuje do strony `window.Capacitor`; pluginy
    bierzemy przez `window.Capacitor.Plugins.<Nazwa>` (Camera, Haptics, App,
-   StatusBar, opcjonalnie HealthConnect z capacitor-health-connect — może go
-   nie być, stąd feature-check przy każdym użyciu). Wszystko tu jest
+   StatusBar, opcjonalnie HealthPlugin z capacitor-health — może go nie być,
+   stąd feature-check przy każdym użyciu). Wszystko tu jest
    opcjonalne: brak pluginu = brak przycisku/efektu, nigdy wyjątek na ekranie. */
 const NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
 const nativePlugin = (name) =>
@@ -740,30 +740,27 @@ async function haptic() {
 }
 
 async function stepsFromHealthConnect() {
-  const HC = nativePlugin("HealthConnect");
+  // Plugin `capacitor-health` (rejestruje się jako Plugins.HealthPlugin):
+  // isHealthAvailable() → {available}; requestHealthPermissions({permissions})
+  // → {permissions:[...]}; queryAggregated({startDate, endDate, dataType, bucket})
+  // → {aggregatedData:[{startDate, endDate, value}]}.
+  const HC = nativePlugin("HealthPlugin");
   const status = document.getElementById("a-hc-status");
   if (!HC) return;
   const day = document.getElementById("t-date").value || todayIso();
   status.textContent = "Odczyt z Health Connect…";
   try {
-    // TODO(android): zweryfikować z zainstalowaną wersją capacitor-health-connect:
-    //   HealthConnect.checkAvailability() → {availability: "Available" | ...}
-    //   HealthConnect.requestHealthPermissions({read: ["Steps"], write: []})
-    //   HealthConnect.readRecords({type: "Steps", timeRangeFilter: {type: "between",
-    //       startTime: Date, endTime: Date}}) → {records: [{count, startTime, endTime}]}
-    if (typeof HC.checkAvailability === "function") {
-      const a = await HC.checkAvailability();
-      if (a && a.availability && a.availability !== "Available") {
-        throw new Error("Health Connect niedostępny (" + a.availability + ")");
-      }
-    }
-    await HC.requestHealthPermissions({read: ["Steps"], write: []});
-    const res = await HC.readRecords({
-      type: "Steps",
-      timeRangeFilter: {type: "between",
-        startTime: new Date(day + "T00:00:00"), endTime: new Date(day + "T23:59:59.999")},
+    const avail = await HC.isHealthAvailable();
+    if (!avail || !avail.available) { status.textContent = "Health Connect niedostępny."; return; }
+    await HC.requestHealthPermissions({permissions: ["READ_STEPS"]});
+    // od lokalnej północy wybranego dnia do następnej północy
+    const start = new Date(day + "T00:00:00");
+    const end = new Date(start.getTime()); end.setDate(end.getDate() + 1);
+    const res = await HC.queryAggregated({
+      startDate: start.toISOString(), endDate: end.toISOString(), dataType: "steps", bucket: "day",
     });
-    const total = ((res && res.records) || []).reduce((sum, r) => sum + (+r.count || 0), 0);
+    const total = Math.round(((res && res.aggregatedData) || [])
+      .reduce((sum, r) => sum + (+r.value || 0), 0));
     if (!total) { status.textContent = "Health Connect nie ma kroków dla tego dnia."; return; }
     await apiJson(`/api/day/${day}/steps`, {steps: total});
     track("steps_health_connect");
@@ -780,7 +777,7 @@ function initNative() {
   if (!NATIVE) return;
   document.getElementById("f-photo").style.display = "none";
   document.getElementById("f-photo-native").style.display = "";
-  if (nativePlugin("HealthConnect")) document.getElementById("a-hc-btn").style.display = "";
+  if (nativePlugin("HealthPlugin")) document.getElementById("a-hc-btn").style.display = "";
   track("native_app_open");   // adopcja powłoki Android na /usage
 }
 

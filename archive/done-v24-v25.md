@@ -6,7 +6,7 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
-## Most natywny w `mobile.html` dla powłoki Android (Capacitor) (25.2.0)
+## Most natywny w `mobile.html` dla powłoki Android (Capacitor) (25.2.0, 25.2.1)
 
 - **Kontekst:** `android-app/` (Capacitor) ładuje `https://fit.krasnal.cc/mobile`
   w WebView i wstrzykuje `window.Capacitor`. Cała obsługa siedzi w jednej
@@ -18,8 +18,10 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
   bez `downscale()`; `resetAddForm()` go czyści.
 - **Wibracje:** `Haptics.impact({style:'Light'})` po zapisie posiłku i wagi,
   no-op bez pluginu. **Health Connect:** przycisk „Kroki z Health Connect"
-  w Krokach tylko gdy plugin istnieje; odczyt sumy kroków dnia → istniejący
-  `POST /api/day/{day}/steps`. Wywołania pluginu do weryfikacji (TODO w kodzie).
+  w Krokach tylko gdy plugin `capacitor-health` (`Plugins.HealthPlugin`)
+  istnieje; `isHealthAvailable` → `requestHealthPermissions(READ_STEPS)` →
+  `queryAggregated(steps, bucket day)` od lokalnej północy do następnej,
+  suma → istniejący `POST /api/day/{day}/steps` (25.2.1).
 - **Statystyki:** nowe zdarzenia `native_app_open` (raz przy starcie),
   `photo_native_camera`, `photo_native_gallery`, `steps_health_connect`
   w `usage.EVENTS` — widać na `/usage` w „top zdarzeń". Test w `test_usage.py`.
