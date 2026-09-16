@@ -1,0 +1,28 @@
+output "public_ip" {
+  value = google_compute_address.ip.address
+}
+
+output "service_account_email" {
+  value = google_service_account.vm.email
+}
+
+output "ssh_command" {
+  value = "gcloud compute ssh ${google_compute_instance.vm.name} --project ${var.project_id} --zone ${var.zone} --tunnel-through-iap"
+}
+
+output "setup_command" {
+  description = "Do uruchomienia na VM po pierwszym SSH."
+  value       = "curl -fsSL <RAW_URL_setup-vm.sh> | sudo FIT_DOMAIN=${var.domain} bash"
+}
+
+output "env_hints" {
+  description = "Wartości do /etc/fit-krasnal/env (setup-vm.sh wstawia je, gdy dostanie zmienne)."
+  value = {
+    FIT_KRASNAL_PUBLIC_URL      = "https://${var.domain}"
+    FIT_KRASNAL_ALLOWED_HOSTS   = var.domain
+    FIT_KRASNAL_ALLOWED_EMAILS  = join(",", var.allowed_emails)
+    FIT_KRASNAL_VERTEX_PROJECT  = var.project_id
+    FIT_KRASNAL_VERTEX_LOCATION = var.vertex_location
+    OAUTH_REDIRECT_URI          = "https://${var.domain}/auth/google/callback"
+  }
+}

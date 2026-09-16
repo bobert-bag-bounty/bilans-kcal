@@ -15,20 +15,73 @@ Deploy uruchamia się automatycznie po pushu na `main`.
 
 Dane leżą **poza katalogiem repo**, więc `git reset --hard` przy deployu ich nie rusza.
 
-## 1. Bootstrap maszyny (raz)
+## 0. Infrastruktura GCP (Terraform)
 
-Po SSH na VM:
+Katalog `deploy/terraform/` opisuje całą infrastrukturę: włączenie API,
+konto usługi VM (tylko `roles/aiplatform.user` + `roles/logging.logWriter`,
+bez kluczy), regionalny adres statyczny (tier STANDARD), reguły firewalla
+(80/443 z internetu, 22 **tylko** z zakresu IAP `35.235.240.0/20`) i VM
+`e2-micro` (free tier w `us-central1`, 30 GB pd-standard, Debian 12,
+Shielded VM, OS Login). **Prawdziwe wartości (`terraform.tfvars`) i stan
+trzymaj poza repo**, np. w `~/bilans-kcal-infra/`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mariuszwojciechowski/bilans-kcal/main/deploy/setup-vm.sh | sudo bash
+cp deploy/terraform/terraform.tfvars.example ~/bilans-kcal-infra/terraform.tfvars   # uzupełnij
+cd deploy/terraform
+terraform init -backend-config="path=$HOME/bilans-kcal-infra/terraform.tfstate"
+terraform plan  -var-file=$HOME/bilans-kcal-infra/terraform.tfvars
+terraform apply -var-file=$HOME/bilans-kcal-infra/terraform.tfvars
 ```
 
-Skrypt: instaluje pakiety, zakłada użytkownika `fitkrasnal`, klonuje repo, robi venv,
-generuje `FIT_KRASNAL_SECRET_KEY`, `FIT_KRASNAL_ENC_KEY` i `FIT_KRASNAL_USAGE_SALT`,
-wstawia usługę systemd i wąską regułę sudo (pozwala CI tylko na restart tej jednej
-usługi, nie na cokolwiek innego), a także timer `fit-krasnal-queue.timer`, który co
-minutę woła `scripts/process_meal_queue.py` (przetwarza zaległe posiłki offline dla
-wszystkich użytkowników — patrz `app/services/meal_queue.py`).
+Jeśli adres statyczny albo API istniały wcześniej (ręcznie), zaimportuj je
+przed `apply`, żeby stan się zgadzał:
+
+```bash
+terraform import -var-file=... 'google_project_service.apis["compute.googleapis.com"]' <project>/compute.googleapis.com
+terraform import -var-file=... google_compute_address.ip projects/<project>/regions/<region>/addresses/<nazwa>
+```
+
+SSH wyłącznie tunelem IAP (output `ssh_command`):
+
+```bash
+gcloud compute ssh fit-krasnal --project <project> --zone <zone> --tunnel-through-iap
+```
+
+Uwaga: domyślna VPC ma regułę `default-allow-ssh` (22 z `0.0.0.0/0`, bez
+tagów), która obejmuje **każdą** VM w sieci — dopóki istnieje, port 22 jest
+widoczny z internetu mimo reguły IAP. Terraform jej nie rusza; usuń ją
+świadomie (`gcloud compute firewall-rules delete default-allow-ssh`).
+
+Ekran zgody OAuth i klient OAuth (Web application, origin
+`https://<FIT_DOMAIN>`, redirect `https://<FIT_DOMAIN>/auth/google/callback`)
+powstają ręcznie w Console i nie są w Terraformie.
+
+## 1. Bootstrap maszyny (raz)
+
+Po SSH na VM (skrypt jest idempotentny, można go powtarzać):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/<owner>/bilans-kcal/main/deploy/setup-vm.sh \
+  | sudo FIT_DOMAIN=fit.example.com FIT_AUTH=oidc FIT_ALLOWED_EMAILS=you@example.com \
+         FIT_LLM=vertex FIT_VERTEX_PROJECT=<project> FIT_VERTEX_LOCATION=europe-west1 bash
+```
+
+Parametry: `FIT_DOMAIN` (wymagane), `FIT_REPO_URL` (domyślnie fork
+`bobert-bag-bounty/bilans-kcal`), `FIT_BRANCH`, `FIT_PYTHON` (domyślnie 3.12),
+oraz opcjonalne `FIT_AUTH`, `FIT_ALLOWED_EMAILS`, `FIT_LLM`,
+`FIT_VERTEX_PROJECT`, `FIT_VERTEX_LOCATION`, które przy pierwszym uruchomieniu
+trafiają do `/etc/fit-krasnal/env`.
+
+Skrypt: instaluje pakiety (w tym `caddy` i `unattended-upgrades`), zakłada
+użytkownika `fitkrasnal`, klonuje repo, instaluje Pythona ≥ 3.12 przez `uv`
+do `/opt/uv-python` (poza `/home`, bo usługa ma `ProtectHome=true`), robi
+venv, generuje `FIT_KRASNAL_SECRET_KEY`, `FIT_KRASNAL_ENC_KEY`
+i `FIT_KRASNAL_USAGE_SALT`, pisze `/etc/caddy/Caddyfile` (HTTPS z Let's
+Encrypt dla `FIT_DOMAIN`, `reverse_proxy 127.0.0.1:8321`, nagłówek `Server`
+usunięty, bez rate-limitu — limituje aplikacja), wstawia usługę systemd
+i wąską regułę sudo (CI może tylko restartować tę jedną usługę), a także timer
+`fit-krasnal-queue.timer`, który co minutę woła `scripts/process_meal_queue.py`
+(patrz `app/services/meal_queue.py`).
 
 Trzy zmienne, których brak boli inaczej: bez `FIT_KRASNAL_SECRET_KEY` (własnego)
 i `FIT_KRASNAL_ENC_KEY` proces **nie wstanie** (świadomie — lepiej awaria niż ciche
@@ -37,10 +90,11 @@ statystyki użycia nie zapiszą ani jednego zdarzenia i `/usage` zostanie puste 
 w logu jest wtedy ostrzeżenie przy starcie. Sól jest **stała**: jej zmiana zrywa
 ciągłość statystyk (ten sam użytkownik dostaje nowy pseudonim).
 
-Potem ustaw kod zaproszenia:
+Potem uzupełnij logowanie: dla `FIT_KRASNAL_AUTH=oidc` wpisz
+`FIT_KRASNAL_GOOGLE_CLIENT_ID/SECRET`, dla `password` — kod zaproszenia:
 
 ```bash
-sudo nano /etc/fit-krasnal/env      # wpisz FIT_KRASNAL_INVITE_CODE=...
+sudo nano /etc/fit-krasnal/env
 sudo systemctl restart fit-krasnal
 ```
 
@@ -74,7 +128,8 @@ z `authorized_keys` na VM i wygeneruj nową parę.
 
 ## 3. Caddy
 
-`/etc/caddy/Caddyfile` — strona-rozdzielnik na domenie głównej plus aplikacja:
+`setup-vm.sh` pisze minimalny `/etc/caddy/Caddyfile` dla `FIT_DOMAIN`. Wariant
+z domeną główną (landing) plus aplikacją wygląda tak:
 
 ```
 krasnal.cc {

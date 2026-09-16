@@ -1,0 +1,7 @@
+# Skopiuj do ~/bilans-kcal-infra/terraform.tfvars (POZA repo) i uzupełnij.
+project_id     = "my-gcp-project"
+region         = "us-central1"
+zone           = "us-central1-a"
+domain         = "fit.example.com"
+allowed_emails = ["you@example.com"]
+# vertex_location = "europe-west1"
