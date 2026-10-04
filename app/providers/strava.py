@@ -208,7 +208,10 @@ class StravaProvider:
                 garmin_id=f"strava-{item['id']}",
                 date=activity_date,
                 type=activity_type,
-                duration_s=int(item.get("elapsed_time", 0)),
+                # moving_time, not elapsed_time: elapsed includes pauses (a
+                # forgotten stop gave 10 h for a 1 h ride) and the resting
+                # share subtracted in day.py scales with duration.
+                duration_s=int(item.get("moving_time") or item.get("elapsed_time", 0)),
                 distance_m=item.get("distance"),
                 kcal=kcal,
                 avg_hr=round(avg_hr) if avg_hr else None,

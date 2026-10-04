@@ -65,16 +65,29 @@ def _est_steps(activity: Activity) -> int:
     return 0
 
 
+# A logged workout burns at least ~2 MET, so its resting part is at most half
+# of the gross kcal. An estimate above that means the duration is inflated
+# (Strava elapsed_time with pauses, a forgotten stop) - without the cap the
+# subtraction wiped such workouts out entirely (2026-10-04 audit: 3 of 12
+# Strava activities counted as 0 kcal).
+MAX_RESTING_SHARE = 0.5
+
+
 def _activity_resting_kcal(activity: Activity, summary: DailySummary | None, bmr: float) -> float:
     """Spoczynek zegarka za czas trwania aktywności — do odjęcia od `kcal_garmin`
     (brutto) i uzyskania kcal netto. Kolejność fallbacków wg DONE.md („Poprawa
     wyliczania kcal na dzień w toku", krok 0): per-aktywność → proporcja z
-    dobowego spoczynku Garmina → model Mifflin."""
+    dobowego spoczynku Garmina → model Mifflin. Estimates (not the watch's own
+    per-activity value) are capped at MAX_RESTING_SHARE of the gross kcal."""
     if activity.kcal_bmr_garmin is not None:
         return activity.kcal_bmr_garmin
     if summary and summary.kcal_bmr_garmin is not None:
-        return summary.kcal_bmr_garmin / 86400 * activity.duration_s
-    return bmr / 86400 * activity.duration_s
+        resting = summary.kcal_bmr_garmin / 86400 * activity.duration_s
+    else:
+        resting = bmr / 86400 * activity.duration_s
+    if activity.kcal_garmin:
+        resting = min(resting, MAX_RESTING_SHARE * activity.kcal_garmin)
+    return resting
 
 
 def _garmin_activities_net_kcal(activities: list[Activity], summary: DailySummary | None,

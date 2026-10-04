@@ -51,6 +51,9 @@ EVENTS: set[str] = {
     "calibration_step", "calibration_reset", "calibration_error",
 }
 
+# Reference resting expenditure for stats that have no user profile at hand.
+REFERENCE_BMR_KCAL = 1700
+
 MEAL_SAVE_EVENTS = {"meal_save_photo", "meal_save_text", "meal_save_manual", "meal_save_saved"}
 
 
@@ -325,6 +328,30 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         "duplicates_30d": len(dup_keys),
         "users": len({uid for uid, _ in dup_keys}),
     }
+
+    # Synced workouts whose estimated resting part hit the cap in
+    # day._activity_resting_kcal (inflated duration). Without a profile here
+    # the day's Garmin BMR is used, else a reference adult BMR - approximate.
+    from .day import MAX_RESTING_SHARE
+
+    bmr_by_day = dict(
+        ((uid, d), bmr) for uid, d, bmr in db.execute(
+            select(DailySummary.user_id, DailySummary.date, DailySummary.kcal_bmr_garmin)
+            .where(DailySummary.user_id.in_(allowed_ids), DailySummary.date >= since)
+        ).all()
+    )
+    synced_estimated = [
+        a for acts in acts_by_user_day.values() for a in acts
+        if a.source != "manual" and a.kcal_bmr_garmin is None and a.kcal_garmin
+    ]
+    resting_capped = {
+        "synced_estimated_30d": len(synced_estimated),
+        "capped_30d": sum(
+            1 for a in synced_estimated
+            if (bmr_by_day.get((a.user_id, a.date)) or REFERENCE_BMR_KCAL) / 86400 * a.duration_s
+            > MAX_RESTING_SHARE * a.kcal_garmin
+        ),
+    }
     n_activities = len(activities)
     pct_with_bmr = (
         round(100 * sum(1 for kb, _ in activities if kb is not None) / n_activities, 1)
@@ -389,6 +416,7 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         "source_share": source_share,
         "forecast_ratio": forecast_ratio,
         "manual_dedup": manual_dedup,
+        "resting_capped": resting_capped,
     }
 
 

@@ -16,6 +16,7 @@ w komunikacie commita, nie tutaj.
 
 ## Kcal accuracy audit 2026-10 — [archive/done-kcal-audit-2026-10.md](archive/done-kcal-audit-2026-10.md)
 
+- Strava workouts no longer zeroed by inflated duration (25.2.3)
 - Manual workout that was also synced counts once (25.2.2)
 - Calibration no longer crashes for users without a Garmin daily total (25.2.1)
 

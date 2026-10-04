@@ -3,6 +3,18 @@
 Fixes that came out of the 2026-10-04 review of the daily kcal prediction
 against production tester data. Newest on top.
 
+## Strava workouts no longer zeroed by inflated duration (25.2.3)
+
+- Problem: Strava's `elapsed_time` includes pauses; the resting part subtracted
+  in `day._activity_resting_kcal` scales with duration and exceeded the gross
+  kcal, so 3 of 12 Strava activities counted as 0 kcal.
+- Strava sync now stores `moving_time` (falls back to `elapsed_time`); a resync
+  rewrites rows still inside the sync window.
+- Estimated resting (not the watch's own per-activity value) is capped at
+  `MAX_RESTING_SHARE` = 50% of gross kcal: a logged workout is at least ~2 MET.
+- Stats: `/usage` shows synced activities whose resting estimate hit the cap.
+- Test: `tests/test_resting_cap.py`.
+
 ## Manual workout that was also synced counts once (25.2.2)
 
 - Problem: a workout logged by hand and later synced from Strava/Garmin was
