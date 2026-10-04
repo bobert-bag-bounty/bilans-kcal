@@ -3,6 +3,18 @@
 Fixes that came out of the 2026-10-04 review of the daily kcal prediction
 against production tester data. Newest on top.
 
+## Forecast expects 75% of the usual workout — explicit conservative shift (26.1.0)
+
+- Owner decision 2026-10-04: with the full median (26.0.0) the morning target
+  was too high on ~37% of days (rest days); `day.FORECAST_WORKOUT_SHARE` = 0.75
+  cuts that to ~29%, median forecast/actual 0.93 instead of 0.965 (backtest).
+- CLAUDE.md "Direction of error in the balance" now lists three named shifts
+  and accepts ~250 kcal for this one (others stay 100–150 kcal).
+- `/api/day` reports the unscaled median plus `workout_share`; `mobile.html`
+  says the target uses 75% of it.
+- Stats: forecast ratios on `/usage` gain "too high" share (`above_1_pct`).
+- Test: `tests/test_forecast_workout.py`.
+
 ## Calibration skips partially logged days (26.0.2)
 
 - Problem: a valid day only needed some meal; breakfast-only days look like a

@@ -88,11 +88,17 @@ przetwarzamy, wysyłamy albo jak długo trzymamy → aktualizacja
 DONE.md. Nowy odbiorca danych = bump `PRIVACY_VERSION` (= ponowna zgoda
 testerów). To publiczne zobowiązanie, nie dokumentacja wewnętrzna.
 
-**Kierunek błędu w bilansie** (decyzja właściciela 2026-09-05): przy
-niepewności pokazuj **mniej** pozostałych kcal, nigdy więcej. Skala rzędu
-3–5% wydatku (~100–150 kcal), **jawnie i w jednym miejscu** (zaokrąglenie
-budżetu w dół, asymetryczny clamp kalibracji) — nigdy ukryta w stałych MET
-czy wzorze BMR, bo ukrytego przesunięcia nie da się skalibrować.
+**Direction of error in the balance** (owner decision 2026-09-05, amended
+2026-10-04): under uncertainty show **fewer** remaining kcal, never more.
+Every deliberate shift is **explicit and named**, in exactly these places:
+1. budget rounded down to 50 kcal (`day._floor_to_50`), ~3–5% of expenditure;
+2. asymmetric calibration clamp (`calibration.CLAMP_LOW/HIGH`);
+3. the day forecast expects only `day.FORECAST_WORKOUT_SHARE` (0.75) of the
+   user's median workout — for a daily trainer ~250 kcal, accepted on purpose
+   because a too-high morning target on a rest day cannot be undone.
+Never hide a shift in MET constants, the BMR formula or other model
+coefficients: a hidden shift cannot be calibrated. A new shift = a new item
+on this list.
 
 **Krok „Statystyki" w każdym planie** (decyzja właściciela 2026-09-05): co
 zliczać i jak pokazać na `/usage`, żeby po wdrożeniu było widać **adopcję**

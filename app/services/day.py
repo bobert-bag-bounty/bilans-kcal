@@ -151,6 +151,16 @@ def _sync_hour_local(summary: DailySummary | None, profile: UserProfile) -> floa
     return local.hour + local.minute / 60.0
 
 
+# Second deliberate conservative shift (owner decision 2026-10-04, CLAUDE.md
+# "Direction of error in the balance"): the day forecast expects only this
+# share of the user's median workout. The risk is rest days: with the full
+# median the morning target was too high on ~37% of days (backtest on
+# production data at 08:00); 0.75 cuts that to ~29% at the cost of a median
+# forecast/actual of 0.93 instead of 0.965. For a daily trainer this is
+# ~250 kcal - above the 100-150 kcal of the other shifts, accepted explicitly.
+FORECAST_WORKOUT_SHARE = 0.75
+
+
 def _floor_to_50(value: float) -> int:
     """Zaokrąglenie w dół do pełnych 50 kcal — jedyne miejsce z celowym,
     konserwatywnym przesunięciem w `remaining_kcal` (decyzja właściciela
@@ -340,7 +350,7 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
         bmr_source = "garmin" if bmr_garmin_full is not None else "mifflin"
         sync_hour = _sync_hour_local(summary, profile)
         forecast = full_day_forecast(e.kcal_out, bmr_full, baseline_neat, sync_hour,
-                                     baseline_activity=baseline_activity,
+                                     baseline_activity=FORECAST_WORKOUT_SHARE * baseline_activity,
                                      activity_done=e.activities_net_kcal + e.manual_kcal)
         if summary.forecast_total_kcal is None:
             summary.forecast_total_kcal = round(forecast.total)
@@ -394,7 +404,8 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
                 "bmr_full": round(forecast.bmr_full),
                 "bmr_source": bmr_source,
                 "activity_left": round(forecast.activity_left),
-                "baseline_activity": round(forecast.baseline_activity),
+                "baseline_activity": round(baseline_activity),   # median, unscaled
+                "workout_share": FORECAST_WORKOUT_SHARE,
             }
             if forecast is not None else None
         ),

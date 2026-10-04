@@ -384,6 +384,12 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
                 round(100 * sum(1 for r in ratios if abs(r - 1) > 0.15) / len(ratios), 1)
                 if ratios else None
             ),
+            # Share of days above 1.0 - for the forecast: days whose morning
+            # target was too high (the side FORECAST_WORKOUT_SHARE guards).
+            "above_1_pct": (
+                round(100 * sum(1 for r in ratios if r > 1) / len(ratios), 1)
+                if ratios else None
+            ),
         }
 
     model_ratio = _ratio_stats(

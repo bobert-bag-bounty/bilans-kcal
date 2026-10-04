@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db import Base
 from app.models import Activity, DailySummary, User
 from app.services import usage
+from app.services.day import FORECAST_WORKOUT_SHARE
 from app.services.energy import WAKING_END_H, WAKING_START_H, full_day_forecast
 from tests.conftest import app_today
 from tests.test_activities_api import _seed_summary, _user_id, clients  # noqa: F401
@@ -73,8 +74,11 @@ def test_api_forecast_includes_usual_workout(clients):  # noqa: F811
     body = alice.get(f"/api/day/{today.isoformat()}").json()
     f = body["forecast"]
 
-    assert f["baseline_activity"] == 1000
-    assert f["activity_left"] > 700                 # 08:00/09:00 local, nothing done yet
+    assert f["baseline_activity"] == 1000             # the median itself, unscaled
+    assert f["workout_share"] == FORECAST_WORKOUT_SHARE
+    # 08:00 or 09:00 local, nothing done yet: share x median x waking window left
+    expected = [FORECAST_WORKOUT_SHARE * 1000 * (WAKING_END_H - h) / WAKING for h in (9, 8)]
+    assert expected[0] - 1 <= f["activity_left"] <= expected[1] + 1
     assert f["baseline_neat"] == 300
     assert abs(body["forecast_kcal"] - (f["measured"] + f["resting_left"] + f["neat_left"]
                                         + f["activity_left"])) <= 2
@@ -114,3 +118,24 @@ def test_usage_splits_forecast_accuracy_by_training(tmp_path):
     assert stats["forecast_ratio_training"]["median"] == 0.9
     assert stats["forecast_ratio_rest"]["n"] == 1
     assert stats["forecast_ratio_rest"]["median"] == 1.05
+
+
+def test_workout_share_is_the_explicit_conservative_constant():
+    """CLAUDE.md lists it as the third deliberate shift; changing it must be a
+    visible decision, not a side effect."""
+    assert FORECAST_WORKOUT_SHARE == 0.75
+
+
+def test_usage_ratio_stats_report_share_of_too_high_forecasts(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'hi.db'}")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    db.add(User(id=1, email="t@example.com"))
+    today = date.today()
+    for i, f in enumerate((2700, 3300, 3150, 2900), start=1):
+        db.add(DailySummary(user_id=1, date=today - timedelta(days=i), kcal_total_garmin=3000,
+                            forecast_total_kcal=f, complete=True))
+    db.commit()
+
+    assert usage._stats_model_vs_measurement(db, {1}, today)["forecast_ratio"]["above_1_pct"] == 50.0
+

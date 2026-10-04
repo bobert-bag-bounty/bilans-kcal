@@ -147,7 +147,8 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     mediana <b>{{ r.median if r.median is not none else "—" }}</b>,
     p10 <b>{{ r.p10 if r.p10 is not none else "—" }}</b>,
     p90 <b>{{ r.p90 if r.p90 is not none else "—" }}</b>,
-    poza ±15%: <b>{{ r.outside_15pct if r.outside_15pct is not none else "—" }}%</b></p>
+    poza ±15%: <b>{{ r.outside_15pct if r.outside_15pct is not none else "—" }}%</b>,
+    prognoza za wysoka: <b>{{ r.above_1_pct if r.above_1_pct is not none else "—" }}%</b></p>
   {% endfor %}
   <p class="muted">Domkniętych dni z posiłkiem: {{ model_vs_measurement.source_share.closed_with_meal }},
     z nich bez danych Garmina (bilans z modelu):
