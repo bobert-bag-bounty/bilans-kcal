@@ -102,9 +102,12 @@ def _garmin_activities_net_kcal(activities: list[Activity], summary: DailySummar
 
 
 def _history_baselines(db: Session, user_id: int, day: date, weight_kg: float,
-                       bmr: float) -> tuple[float, int, float | None]:
+                       bmr: float) -> tuple[float, int, float | None, float]:
     """Zwyczajny ruch i spoczynek użytkownika na podstawie historii.
-    Zwraca (neat_kcal, liczba użytych dni, bmr_garmin_full)."""
+    Zwraca (neat_kcal, liczba użytych dni, bmr_garmin_full, activity_kcal).
+    `activity_kcal` is the median net workout kcal per day (synced + manual,
+    duplicates dropped); median, so someone training less than every other
+    day gets 0 and rest days are not inflated."""
     summaries = db.scalars(
         select(DailySummary).where(
             DailySummary.user_id == user_id, DailySummary.date < day,
@@ -115,7 +118,7 @@ def _history_baselines(db: Session, user_id: int, day: date, weight_kg: float,
     bmr_garmin_full = float(statistics.median(bmr_vals)) if len(bmr_vals) >= BASELINE_NEAT_MIN_DAYS else None
 
     if len(summaries) < BASELINE_NEAT_MIN_DAYS:
-        return neat_from_steps(DEFAULT_STEPS, weight_kg), 0, bmr_garmin_full
+        return neat_from_steps(DEFAULT_STEPS, weight_kg), 0, bmr_garmin_full, 0.0
     dates = [s.date for s in summaries]
     acts_by_day: dict[date, list[Activity]] = {}
     for a in db.scalars(
@@ -126,7 +129,13 @@ def _history_baselines(db: Session, user_id: int, day: date, weight_kg: float,
         max(s.kcal_active_garmin - _garmin_activities_net_kcal(acts_by_day.get(s.date, []), s, bmr), 0)
         for s in summaries
     ]
-    return float(statistics.median(values)), len(values), bmr_garmin_full
+    workouts = []
+    for s in summaries:
+        acts = without_manual_duplicates(acts_by_day.get(s.date, []))
+        manual = sum(a.kcal_garmin or 0 for a in acts if a.source == "manual")
+        workouts.append(_garmin_activities_net_kcal(acts, s, bmr) + manual)
+    return (float(statistics.median(values)), len(values), bmr_garmin_full,
+            float(statistics.median(workouts)))
 
 
 def _sync_hour_local(summary: DailySummary | None, profile: UserProfile) -> float:
@@ -324,12 +333,15 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
     baseline_days = 0
     bmr_source = "mifflin"
     if e.out_source == "mixed" and summary is not None:
-        baseline_neat, baseline_days, bmr_garmin_full = _history_baselines(db, user_id, day, weight, e.tdee.bmr)
+        baseline_neat, baseline_days, bmr_garmin_full, baseline_activity = _history_baselines(
+            db, user_id, day, weight, e.tdee.bmr)
         # Spoczynek z historii Garmina, bo prognoza ma trafić w liczbę Garmina.
         bmr_full = bmr_garmin_full if bmr_garmin_full is not None else e.tdee.bmr
         bmr_source = "garmin" if bmr_garmin_full is not None else "mifflin"
         forecast = full_day_forecast(e.kcal_out, bmr_full, baseline_neat,
-                                     _sync_hour_local(summary, profile))
+                                     _sync_hour_local(summary, profile),
+                                     baseline_activity=baseline_activity,
+                                     activity_done=e.activities_net_kcal + e.manual_kcal)
         if summary.forecast_total_kcal is None:
             summary.forecast_total_kcal = round(forecast.total)
             db.commit()
@@ -380,6 +392,8 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
                 "baseline_days": baseline_days,
                 "bmr_full": round(forecast.bmr_full),
                 "bmr_source": bmr_source,
+                "activity_left": round(forecast.activity_left),
+                "baseline_activity": round(forecast.baseline_activity),
             }
             if forecast is not None else None
         ),

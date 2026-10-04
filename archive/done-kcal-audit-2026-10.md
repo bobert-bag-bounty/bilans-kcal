@@ -3,6 +3,20 @@
 Fixes that came out of the 2026-10-04 review of the daily kcal prediction
 against production tester data. Newest on top.
 
+## Day forecast expects the user's usual workout (26.0.0)
+
+- Problem: the forecast was measured + resting + NEAT, never a workout. For the
+  Garmin tester (trains ~24 of 28 days) median forecast/actual was 0.65,
+  error −1016 kcal; on rest days it was 0.98, so the workout was the whole gap.
+- New term: median net workout kcal of the last 7 closed days, minus what is
+  already done today, spread over the rest of the waking window (6–23).
+- Median, not mean, and no share < 1: backtest on production data at 08:00 moved
+  median ratio 0.78 → 0.965 and days outside ±15% from 64% to 42%; occasional
+  trainers get 0. Conservatism stays explicit (floor to 50, calibration clamp).
+- `mobile.html` explains the term in the target breakdown.
+- Stats: `/usage` splits forecast/actual into training and rest days.
+- Test: `tests/test_forecast_workout.py`.
+
 ## Strava workouts no longer zeroed by inflated duration (25.2.3)
 
 - Problem: Strava's `elapsed_time` includes pauses; the resting part subtracted

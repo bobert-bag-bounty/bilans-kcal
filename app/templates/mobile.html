@@ -813,6 +813,7 @@ async function renderTargetFormula() {
         + `Prognoza doby = zmierzone przez Garmina ${f.measured} + spoczynek do północy ${f.resting_left} `
         + `+ zwyczajny ruch do wieczora ${f.neat_left}`
         + (f.baseline_days ? ` (Twoja baza ${f.baseline_neat} kcal/d, mediana z ${f.baseline_days} dni)` : ` (baza domyślna ${f.baseline_neat} kcal/d — za mało historii)`)
+        + (f.baseline_activity ? ` + typowy trening, którego jeszcze nie było ${f.activity_left} (Twoja mediana ${f.baseline_activity} kcal/d)` : "")
         + `. Każda zsynchronizowana aktywność podnosi prognozę od razu.`;
     } else {
       txt = `Cel dnia (dziś) = spalone ${rep.kcal_out} × kalibracja ${calStr} + bilans ${balSigned} = ${rep.target_kcal}.`;

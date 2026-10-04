@@ -136,6 +136,14 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     p90 <b>{{ model_vs_measurement.forecast_ratio.p90 if model_vs_measurement.forecast_ratio.p90 is not none else "—" }}</b>,
     poza ±15%: <b>{{ model_vs_measurement.forecast_ratio.outside_15pct if model_vs_measurement.forecast_ratio.outside_15pct is not none else "—" }}%</b>
     — czy cel dnia pokazywany rano trafia w to, co doba naprawdę przyniosła.</p>
+  {% for label, r in [("z treningiem", model_vs_measurement.forecast_ratio_training),
+                      ("bez treningu", model_vs_measurement.forecast_ratio_rest)] %}
+  <p class="muted">Prognoza / pomiar, dni {{ label }} ({{ r.n }}):
+    mediana <b>{{ r.median if r.median is not none else "—" }}</b>,
+    p10 <b>{{ r.p10 if r.p10 is not none else "—" }}</b>,
+    p90 <b>{{ r.p90 if r.p90 is not none else "—" }}</b>,
+    poza ±15%: <b>{{ r.outside_15pct if r.outside_15pct is not none else "—" }}%</b></p>
+  {% endfor %}
   <p class="muted">Domkniętych dni z posiłkiem: {{ model_vs_measurement.source_share.closed_with_meal }},
     z nich bez danych Garmina (bilans z modelu):
     <b>{{ model_vs_measurement.source_share.without_garmin_pct if model_vs_measurement.source_share.without_garmin_pct is not none else "—" }}%</b>.</p>

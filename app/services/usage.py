@@ -314,7 +314,7 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
     ).all()
 
     # Manual entries that duplicate a synced workout (excluded from kcal).
-    from .activity_dedup import manual_duplicates
+    from .activity_dedup import manual_duplicates, without_manual_duplicates
 
     acts_by_user_day: dict[tuple[int, date], list[Activity]] = {}
     for a in db.scalars(
@@ -392,6 +392,20 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         [f / g for _, _, g, _, complete, f in rows
          if complete and g is not None and g > 0 and f is not None]
     )
+    # Same, split by whether the day had a workout: the forecast expects the
+    # usual workout (energy.full_day_forecast), so training days should move
+    # towards 1.0 and rest days should not drift far above it.
+    def _trained(uid: int, d: date) -> bool:
+        return bool(without_manual_duplicates(acts_by_user_day.get((uid, d), [])))
+
+    forecast_ratio_training = _ratio_stats(
+        [f / g for uid, d, g, _, complete, f in rows
+         if complete and g is not None and g > 0 and f is not None and _trained(uid, d)]
+    )
+    forecast_ratio_rest = _ratio_stats(
+        [f / g for uid, d, g, _, complete, f in rows
+         if complete and g is not None and g > 0 and f is not None and not _trained(uid, d)]
+    )
 
     meal_days = set(
         db.execute(
@@ -415,6 +429,8 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         "pct_with_steps": pct_with_steps, "model_ratio": model_ratio,
         "source_share": source_share,
         "forecast_ratio": forecast_ratio,
+        "forecast_ratio_training": forecast_ratio_training,
+        "forecast_ratio_rest": forecast_ratio_rest,
         "manual_dedup": manual_dedup,
         "resting_capped": resting_capped,
     }
