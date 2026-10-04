@@ -51,6 +51,9 @@ EVENTS: set[str] = {
     "calibration_step", "calibration_reset", "calibration_error",
 }
 
+# Forecast snapshots taken before this local hour count as "morning".
+MORNING_SNAPSHOT_END_H = 12
+
 # Reference resting expenditure for stats that have no user profile at hand.
 REFERENCE_BMR_KCAL = 1700
 
@@ -402,6 +405,27 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         [f / g for uid, d, g, _, complete, f in rows
          if complete and g is not None and g > 0 and f is not None and _trained(uid, d)]
     )
+    # Only forecasts taken in the morning: a real prediction, not a
+    # near-final number from an evening visit (DailySummary.forecast_hour_local).
+    hour_by_day = {
+        (uid, d): h for uid, d, h in db.execute(
+            select(DailySummary.user_id, DailySummary.date, DailySummary.forecast_hour_local)
+            .where(DailySummary.user_id.in_(allowed_ids), DailySummary.date >= since,
+                   DailySummary.forecast_hour_local.is_not(None))
+        ).all()
+    }
+    forecast_ratio_morning = _ratio_stats(
+        [f / g for uid, d, g, _, complete, f in rows
+         if complete and g is not None and g > 0 and f is not None
+         and hour_by_day.get((uid, d), 24.0) < MORNING_SNAPSHOT_END_H]
+    )
+    hours = sorted(hour_by_day.values())
+    forecast_hours = {
+        "known": len(hours),
+        "median": round(_percentile(hours, 50), 1) if hours else None,
+        "p10": round(_percentile(hours, 10), 1) if hours else None,
+        "p90": round(_percentile(hours, 90), 1) if hours else None,
+    }
     forecast_ratio_rest = _ratio_stats(
         [f / g for uid, d, g, _, complete, f in rows
          if complete and g is not None and g > 0 and f is not None and not _trained(uid, d)]
@@ -429,6 +453,8 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         "pct_with_steps": pct_with_steps, "model_ratio": model_ratio,
         "source_share": source_share,
         "forecast_ratio": forecast_ratio,
+        "forecast_ratio_morning": forecast_ratio_morning,
+        "forecast_hours": forecast_hours,
         "forecast_ratio_training": forecast_ratio_training,
         "forecast_ratio_rest": forecast_ratio_rest,
         "manual_dedup": manual_dedup,
@@ -678,6 +704,7 @@ def _my_days(db: Session, admin_id: int, limit: int = 14) -> list[dict]:
             "kcal_bmr_garmin": s.kcal_bmr_garmin,
             "model_total_kcal": s.model_total_kcal,
             "forecast_total_kcal": s.forecast_total_kcal,
+            "forecast_hour_local": s.forecast_hour_local,
             "activities": acts_by_day.get(s.date, {}).get("count", 0),
             "activities_with_bmr": acts_by_day.get(s.date, {}).get("with_bmr", 0),
         }

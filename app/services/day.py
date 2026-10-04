@@ -338,12 +338,13 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
         # Spoczynek z historii Garmina, bo prognoza ma trafić w liczbę Garmina.
         bmr_full = bmr_garmin_full if bmr_garmin_full is not None else e.tdee.bmr
         bmr_source = "garmin" if bmr_garmin_full is not None else "mifflin"
-        forecast = full_day_forecast(e.kcal_out, bmr_full, baseline_neat,
-                                     _sync_hour_local(summary, profile),
+        sync_hour = _sync_hour_local(summary, profile)
+        forecast = full_day_forecast(e.kcal_out, bmr_full, baseline_neat, sync_hour,
                                      baseline_activity=baseline_activity,
                                      activity_done=e.activities_net_kcal + e.manual_kcal)
         if summary.forecast_total_kcal is None:
             summary.forecast_total_kcal = round(forecast.total)
+            summary.forecast_hour_local = round(sync_hour, 1)
             db.commit()
     # Zaokrąglone TUTAJ, nie dopiero w odpowiedzi: cel dnia ma się liczyć z tej
     # samej liczby, którą API zwraca jako `forecast_kcal` — inaczej równanie

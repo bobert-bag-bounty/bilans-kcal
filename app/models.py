@@ -91,6 +91,11 @@ class DailySummary(Base):
     # wejściu na dzień; po domknięciu doby porównywana z kcal_total_garmin na
     # /usage. Bez backfillu.
     forecast_total_kcal: Mapped[int | None] = mapped_column(Integer)
+    # Local hour (with fraction) the stored forecast was computed for - the
+    # time of the Garmin sync it extends. A forecast at 22:00 is nearly the
+    # measurement itself, one at 07:00 is a real prediction; without the hour
+    # /usage mixed both. NULL for rows from before 26.0.1 (not recoverable).
+    forecast_hour_local: Mapped[float | None] = mapped_column(Float)
 
 
 class Activity(Base):

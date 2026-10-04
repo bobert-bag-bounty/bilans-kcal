@@ -3,6 +3,17 @@
 Fixes that came out of the 2026-10-04 review of the daily kcal prediction
 against production tester data. Newest on top.
 
+## Stored forecast keeps the hour it was made for (26.0.1)
+
+- Problem: `forecast_total_kcal` is written on the first visit of the day with
+  no time, so `/usage` mixed 07:00 predictions with near-final 22:00 numbers.
+- New column `DailySummary.forecast_hour_local` (local sync hour, 0.1 h),
+  written together with the forecast; additive migration, old rows stay NULL.
+- Stats: `/usage` shows the snapshot hour distribution and forecast/actual for
+  morning snapshots only (before 12:00); "Moje dni" shows the hour per day.
+- Privacy note unchanged: the hour is derived from the sync time we already store.
+- Test: `tests/test_forecast_hour.py`.
+
 ## Day forecast expects the user's usual workout (26.0.0)
 
 - Problem: the forecast was measured + resting + NEAT, never a workout. For the

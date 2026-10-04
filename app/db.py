@@ -132,6 +132,9 @@ def _migrate(engine) -> None:
         if summary_cols and "forecast_total_kcal" not in summary_cols:
             conn.execute(text("ALTER TABLE daily_summary ADD COLUMN forecast_total_kcal INTEGER"))
             conn.commit()
+        if summary_cols and "forecast_hour_local" not in summary_cols:
+            conn.execute(text("ALTER TABLE daily_summary ADD COLUMN forecast_hour_local FLOAT"))
+            conn.commit()
 
         pending_meal_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(pending_meal)"))]
         if pending_meal_cols and "next_attempt_at" not in pending_meal_cols:

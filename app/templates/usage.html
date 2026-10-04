@@ -74,7 +74,7 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
         <td>{{ d.kcal_active_garmin if d.kcal_active_garmin is not none else "—" }}</td>
         <td>{{ d.kcal_bmr_garmin if d.kcal_bmr_garmin is not none else "—" }}</td>
         <td>{{ d.model_total_kcal if d.model_total_kcal is not none else "—" }}</td>
-        <td>{{ d.forecast_total_kcal if d.forecast_total_kcal is not none else "—" }}</td>
+        <td>{{ d.forecast_total_kcal if d.forecast_total_kcal is not none else "—" }}{% if d.forecast_hour_local is not none %} <span class="muted">@{{ d.forecast_hour_local }}</span>{% endif %}</td>
         <td>{{ d.activities }}</td><td>{{ d.activities_with_bmr }}</td></tr>
       {% else %}
       <tr><td colspan="8" class="muted">Brak danych.</td></tr>
@@ -136,7 +136,12 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     p90 <b>{{ model_vs_measurement.forecast_ratio.p90 if model_vs_measurement.forecast_ratio.p90 is not none else "—" }}</b>,
     poza ±15%: <b>{{ model_vs_measurement.forecast_ratio.outside_15pct if model_vs_measurement.forecast_ratio.outside_15pct is not none else "—" }}%</b>
     — czy cel dnia pokazywany rano trafia w to, co doba naprawdę przyniosła.</p>
-  {% for label, r in [("z treningiem", model_vs_measurement.forecast_ratio_training),
+  {% set fh = model_vs_measurement.forecast_hours %}
+  <p class="muted">Godzina zapisanej prognozy ({{ fh.known }} dni z zapisaną godziną):
+    mediana <b>{{ fh.median if fh.median is not none else "—" }}</b>,
+    p10 {{ fh.p10 if fh.p10 is not none else "—" }}, p90 {{ fh.p90 if fh.p90 is not none else "—" }}.</p>
+  {% for label, r in [("z porannym zapisem (przed 12:00)", model_vs_measurement.forecast_ratio_morning),
+                      ("z treningiem", model_vs_measurement.forecast_ratio_training),
                       ("bez treningu", model_vs_measurement.forecast_ratio_rest)] %}
   <p class="muted">Prognoza / pomiar, dni {{ label }} ({{ r.n }}):
     mediana <b>{{ r.median if r.median is not none else "—" }}</b>,
