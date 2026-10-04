@@ -309,6 +309,22 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         .where(Activity.user_id.in_(allowed_ids), Activity.source == "garmin",
                Activity.date >= since)
     ).all()
+
+    # Manual entries that duplicate a synced workout (excluded from kcal).
+    from .activity_dedup import manual_duplicates
+
+    acts_by_user_day: dict[tuple[int, date], list[Activity]] = {}
+    for a in db.scalars(
+        select(Activity).where(Activity.user_id.in_(allowed_ids), Activity.date >= since)
+    ).all():
+        acts_by_user_day.setdefault((a.user_id, a.date), []).append(a)
+    n_manual = sum(1 for acts in acts_by_user_day.values() for a in acts if a.source == "manual")
+    dup_keys = [k for k, acts in acts_by_user_day.items() for _ in manual_duplicates(acts)]
+    manual_dedup = {
+        "manual_30d": n_manual,
+        "duplicates_30d": len(dup_keys),
+        "users": len({uid for uid, _ in dup_keys}),
+    }
     n_activities = len(activities)
     pct_with_bmr = (
         round(100 * sum(1 for kb, _ in activities if kb is not None) / n_activities, 1)
@@ -372,6 +388,7 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         "pct_with_steps": pct_with_steps, "model_ratio": model_ratio,
         "source_share": source_share,
         "forecast_ratio": forecast_ratio,
+        "manual_dedup": manual_dedup,
     }
 
 

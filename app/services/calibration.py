@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Activity, Calibration, CalibrationLog, CalibrationState, DailySummary, Meal, WeightLog
+from .activity_dedup import without_manual_duplicates
 from .balance import KCAL_PER_KG_FAT
 from .energy import smoothed_weight
 
@@ -90,7 +91,8 @@ def step_day(state: FilterState, day: date, kcal_in: float, kcal_out: float,
 
 
 def _day_kcal_out(summary: DailySummary, activities: list[Activity]) -> float:
-    manual_kcal = sum(a.kcal_garmin or 0 for a in activities if a.source == "manual")
+    manual_kcal = sum(a.kcal_garmin or 0 for a in without_manual_duplicates(activities)
+                      if a.source == "manual")
     return summary.kcal_total_garmin + manual_kcal
 
 

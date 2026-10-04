@@ -117,6 +117,9 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     <div class="kpi"><b>{{ model_vs_measurement.pct_with_bmr if model_vs_measurement.pct_with_bmr is not none else "—" }}%</b><span class="muted">z BMR aktywności</span></div>
     <div class="kpi"><b>{{ model_vs_measurement.pct_with_steps if model_vs_measurement.pct_with_steps is not none else "—" }}%</b><span class="muted">z krokami</span></div>
   </div>
+  <p class="muted" style="margin-top:10px">Ręczne wpisy zdublowane z synchronizacją (30 dni, nie liczone do wydatku):
+    <b>{{ model_vs_measurement.manual_dedup.duplicates_30d }}</b> z {{ model_vs_measurement.manual_dedup.manual_30d }} ręcznych,
+    u {{ model_vs_measurement.manual_dedup.users }} os.</p>
   <p class="muted" style="margin-top:10px">Rozjazd model / pomiar (model_total_kcal ÷ kcal_total_garmin,
     {{ model_vs_measurement.model_ratio.n }} dni domkniętych z obiema wartościami):
     mediana <b>{{ model_vs_measurement.model_ratio.median if model_vs_measurement.model_ratio.median is not none else "—" }}</b>,

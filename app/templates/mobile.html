@@ -1550,10 +1550,14 @@ async function loadActivityList(day) {
         const dist = a.distance_m ? ` · ${(a.distance_m/1000).toFixed(1)} km` : "";
         const steps = a.est_steps ? ` (~${a.est_steps} kroków)` : "";
         const mins = Math.round(a.duration_s / 60);
-        html += `<div class="entry">
+        // Same workout already synced from the source: kept, but not counted.
+        const kcal = a.duplicate
+          ? `<s>${a.kcal_garmin} kcal</s> · nie liczymy — ten sam trening przyszedł już ${SRC().fromGen}`
+          : `${a.kcal_garmin} kcal`;
+        html += `<div class="entry"${a.duplicate ? ' style="opacity:.6"' : ""}>
           <div style="flex:1">
             <div><b>${TYPE_LABELS[a.type] || esc(a.type)}</b> ${mins} min${dist}${steps}</div>
-            <div class="muted">${a.kcal_garmin} kcal</div>
+            <div class="muted">${kcal}</div>
           </div>
           <button class="x" onclick="deleteActivity(${a.id}, renderToday)">✕</button>
         </div>`;

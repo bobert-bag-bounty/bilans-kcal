@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from ..models import Activity, DailySummary, Meal, PendingMeal, UserProfile, WeightLog
 from ..providers import garmin as garmin_provider
 from . import calibration, quips
+from .activity_dedup import manual_duplicates, without_manual_duplicates
 from .clock import user_now, user_today, user_tz
 from .balance import day_balance, deficit_warning, projected_weekly_change_kg
 from .energy import (
@@ -174,6 +175,8 @@ def day_energy(
     „dziś" w momencie synchronizacji) — parametr zostaje w sygnaturze pod
     punkt „Strefa czasowa użytkownika jako granica dnia" z DONE.md."""
     kcal_in = sum(m.kcal for m in meals)
+    # A hand-logged workout that the watch/Strava also synced counts once.
+    activities = without_manual_duplicates(activities)
 
     steps = summary.steps if summary and summary.steps else DEFAULT_STEPS
     age = age_from_year(profile.birth_year, day)
@@ -267,6 +270,7 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
     )
 
     e = day_energy(profile, weight, day, summary, activities, meals, user_today(profile))
+    duplicate_ids = {a.id for a in manual_duplicates(activities)}
 
     if e.out_source in ("garmin", "mixed"):
         if summary and summary.kcal_bmr_garmin is not None:
@@ -423,6 +427,7 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
             {
                 "id": a.id, "type": a.type, "duration_s": a.duration_s, "distance_m": a.distance_m,
                 "kcal_garmin": a.kcal_garmin, "source": a.source,
+                "duplicate": a.id in duplicate_ids,
                 **({"est_steps": _est_steps(a)} if a.source == "manual" and _est_steps(a) else {}),
             }
             for a in activities

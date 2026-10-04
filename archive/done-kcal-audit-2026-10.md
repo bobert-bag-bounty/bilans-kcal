@@ -3,6 +3,18 @@
 Fixes that came out of the 2026-10-04 review of the daily kcal prediction
 against production tester data. Newest on top.
 
+## Manual workout that was also synced counts once (25.2.2)
+
+- Problem: a workout logged by hand and later synced from Strava/Garmin was
+  summed twice (Strava tester: 4 of 5 days, one ride 3026 kcal instead of ~1700).
+- Match without start times: same day + sport family + distance within 20%
+  (duration within 25% when a distance is missing); one synced workout shadows
+  at most one manual entry. The synced one wins because it is measured.
+- Applied in `day.day_energy` (Today, Trends) and `calibration._day_kcal_out`;
+  the manual row is kept and shown greyed out in `mobile.html` with a note.
+- Stats: `/usage` shows manual entries flagged as duplicates over 30 days.
+- Test: `tests/test_activity_dedup.py`.
+
 ## Calibration no longer crashes for users without a Garmin daily total (25.2.1)
 
 - Problem: `catch_up` computed `kcal_out` from `kcal_total_garmin` before
