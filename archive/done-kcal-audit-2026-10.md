@@ -3,6 +3,17 @@
 Fixes that came out of the 2026-10-04 review of the daily kcal prediction
 against production tester data. Newest on top.
 
+## Calibration skips partially logged days (26.0.2)
+
+- Problem: a valid day only needed some meal; breakfast-only days look like a
+  huge deficit and pushed the factor down by the full daily step (simulation:
+  20% such days -> factor 0.90 after 6 months, still falling).
+- Days with logged intake < `MIN_INTAKE_SHARE` (0.4) of expenditure are skipped
+  in both the daily filter and the batch snapshot. Production: lowest real day
+  0.48 (big training day), median 1.14 - none of 52 days would be skipped.
+- Stats: event `calibration_skip_partial`, shown on `/usage` (30 days).
+- Test: `tests/test_calibration_partial_days.py` (drift 0.056 without the filter).
+
 ## Stored forecast keeps the hour it was made for (26.0.1)
 
 - Problem: `forecast_total_kcal` is written on the first visit of the day with

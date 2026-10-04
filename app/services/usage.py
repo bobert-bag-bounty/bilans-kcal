@@ -48,7 +48,7 @@ EVENTS: set[str] = {
     "day_view",
     "tab_today", "tab_add", "tab_activities", "tab_trends", "tab_settings",
     "manual_open", "saved_meals_open", "photo_pick",
-    "calibration_step", "calibration_reset", "calibration_error",
+    "calibration_step", "calibration_reset", "calibration_error", "calibration_skip_partial",
 }
 
 # Forecast snapshots taken before this local hour count as "morning".
@@ -539,6 +539,8 @@ def _stats_calibration(db: Session, allowed_ids: set[int], allowed_refs: set[str
         "reset_30": _event_sum(db, allowed_refs, "calibration_reset", today - timedelta(days=29), today),
         "error_7": _event_sum(db, allowed_refs, "calibration_error", today - timedelta(days=6), today),
         "error_30": _event_sum(db, allowed_refs, "calibration_error", today - timedelta(days=29), today),
+        "skip_partial_30": _event_sum(db, allowed_refs, "calibration_skip_partial",
+                                      today - timedelta(days=29), today),
     }
 
 

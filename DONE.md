@@ -16,6 +16,7 @@ w komunikacie commita, nie tutaj.
 
 ## Kcal accuracy audit 2026-10 — [archive/done-kcal-audit-2026-10.md](archive/done-kcal-audit-2026-10.md)
 
+- Calibration skips partially logged days (26.0.2)
 - Stored forecast keeps the hour it was made for (26.0.1)
 - Day forecast expects the user's usual workout (26.0.0)
 - Strava workouts no longer zeroed by inflated duration (25.2.3)

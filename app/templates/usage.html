@@ -172,7 +172,8 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     (<b>{{ calibration_stats.learning.pct_entered if calibration_stats.learning.pct_entered is not none else "—" }}%</b>).</p>
   <p class="{{ 'warn' if calibration_stats.reset_7 > 0 or calibration_stats.error_7 > 0 else 'muted' }}">
     Resety strażnika: {{ calibration_stats.reset_7 }} (7 dni) / {{ calibration_stats.reset_30 }} (30 dni).
-    Błędy catch_up: {{ calibration_stats.error_7 }} (7 dni) / {{ calibration_stats.error_30 }} (30 dni).</p>
+    Błędy catch_up: {{ calibration_stats.error_7 }} (7 dni) / {{ calibration_stats.error_30 }} (30 dni).
+    Dni pominięte jako niepełne (spożycie &lt; 40% wydatku): {{ calibration_stats.skip_partial_30 }} (30 dni).</p>
   <p class="muted" style="margin-top:6px">Szum wagi w populacji — mediana tygodniowa |innov_kg|:</p>
   {{ calibration_stats.chart_innov | safe }}
 </section>

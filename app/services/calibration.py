@@ -40,6 +40,12 @@ GAIN_OFFSET = 5              # gain dnia 1 = 1/(0+5) ≈ 0.17
 GAP_RESET_DAYS = 21          # przerwa bez ważnego dnia > tyle → days_used = 0
 MIN_VALID_DAYS_BATCH = 10    # próg wsadu (`compute`), też warunek pierwszego wpisu
 GUARD_DIVERGENCE = 0.10      # filtr vs wsad różnią się > 10% → reset filtru do wsadu
+# Logged intake below this share of expenditure is treated as a partially
+# logged day and skipped: it looks like a huge deficit, and every such day
+# pushed the factor down by the full daily step (simulation: 20% partial days
+# drift the factor to 0.90 in 6 months and on towards the clamp). Production
+# 2026-10: the lowest real day was 0.48 (big training day), median 1.14.
+MIN_INTAKE_SHARE = 0.4
 
 
 def _clamp_factor(factor: float) -> float:
@@ -94,6 +100,10 @@ def _day_kcal_out(summary: DailySummary, activities: list[Activity]) -> float:
     manual_kcal = sum(a.kcal_garmin or 0 for a in without_manual_duplicates(activities)
                       if a.source == "manual")
     return summary.kcal_total_garmin + manual_kcal
+
+
+def _plausible_intake(kcal_in: float, kcal_out: float) -> bool:
+    return kcal_in >= MIN_INTAKE_SHARE * kcal_out
 
 
 def _is_valid_day(summary: DailySummary | None, meals: list[Meal]) -> bool:
@@ -155,10 +165,11 @@ def compute(db: Session, user_id: int, period_days: int = 14) -> Calibration | N
         if _is_valid_day(summary, meals):
             kcal_in = sum(m.kcal for m in meals)
             kcal_out = _day_kcal_out(summary, activities_by_day.get(d, []))
-            sum_balance += kcal_in - kcal_out
-            sum_kcal_in += kcal_in
-            sum_kcal_out += kcal_out
-            valid_days += 1
+            if _plausible_intake(kcal_in, kcal_out):
+                sum_balance += kcal_in - kcal_out
+                sum_kcal_in += kcal_in
+                sum_kcal_out += kcal_out
+                valid_days += 1
         d += timedelta(days=1)
 
     if valid_days < MIN_VALID_DAYS_BATCH or sum_kcal_out <= 0:
@@ -251,6 +262,7 @@ def catch_up(db: Session, user_id: int) -> CalibrationState:
     )
 
     stepped_days: list[date] = []
+    skipped_partial_days: list[date] = []
     d = start_day
     while d <= end_day:
         if state.last_valid_day is not None and (d - state.last_valid_day).days > GAP_RESET_DAYS:
@@ -263,8 +275,11 @@ def catch_up(db: Session, user_id: int) -> CalibrationState:
         # kcal_out first raised TypeError on every catch_up.
         valid = _is_valid_day(summary, meals) and weight_kg is not None
         kcal_out = _day_kcal_out(summary, activities_by_day.get(d, [])) if valid else 0
+        kcal_in = sum(m.kcal for m in meals)
+        if valid and kcal_out > 0 and not _plausible_intake(kcal_in, kcal_out):
+            skipped_partial_days.append(d)
+            valid = False
         if valid and kcal_out > 0:
-            kcal_in = sum(m.kcal for m in meals)
             result = step_day(state, d, kcal_in, kcal_out, weight_kg)
             state = result.state
             if result.log_entry is not None:
@@ -289,6 +304,8 @@ def catch_up(db: Session, user_id: int) -> CalibrationState:
 
     for stepped_day in stepped_days:
         usage.bump(db, user_id, "calibration_step", day=stepped_day)
+    for skipped_day in skipped_partial_days:
+        usage.bump(db, user_id, "calibration_skip_partial", day=skipped_day)
 
     _guard_against_batch_divergence(db, user_id, row)
     db.commit()
