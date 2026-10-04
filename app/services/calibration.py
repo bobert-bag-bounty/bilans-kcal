@@ -256,8 +256,12 @@ def catch_up(db: Session, user_id: int) -> CalibrationState:
         summary = summaries.get(d)
         meals = meals_by_day.get(d, [])
         weight_kg = weights_by_day.get(d, weights_by_day.get(d + timedelta(days=1)))
-        kcal_out = _day_kcal_out(summary, activities_by_day.get(d, [])) if summary else 0
-        if _is_valid_day(summary, meals) and weight_kg is not None and kcal_out > 0:
+        # Validate before touching kcal_total_garmin: users without a Garmin
+        # (Strava, manual) have summary rows with a NULL total, and computing
+        # kcal_out first raised TypeError on every catch_up.
+        valid = _is_valid_day(summary, meals) and weight_kg is not None
+        kcal_out = _day_kcal_out(summary, activities_by_day.get(d, [])) if valid else 0
+        if valid and kcal_out > 0:
             kcal_in = sum(m.kcal for m in meals)
             result = step_day(state, d, kcal_in, kcal_out, weight_kg)
             state = result.state

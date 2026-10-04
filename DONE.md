@@ -14,6 +14,10 @@ początek odpowiedniego pliku w `archive/` (najnowsze u góry). Format wpisu
 w archiwum: tytuł + **maksymalnie 5 punktów**; szczegóły implementacji zostają
 w komunikacie commita, nie tutaj.
 
+## Kcal accuracy audit 2026-10 — [archive/done-kcal-audit-2026-10.md](archive/done-kcal-audit-2026-10.md)
+
+- Calibration no longer crashes for users without a Garmin daily total (25.2.1)
+
 ## v24–v25 — [archive/done-v24-v25.md](archive/done-v24-v25.md)
 
 - Integracja ze Strava — dla użytkowników bez Garmina (25.0.0, e102d2f)
