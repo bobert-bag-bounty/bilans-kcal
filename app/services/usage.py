@@ -48,6 +48,8 @@ EVENTS: set[str] = {
     "day_view",
     "tab_today", "tab_add", "tab_activities", "tab_trends", "tab_settings",
     "manual_open", "saved_meals_open", "photo_pick",
+    # Photo estimate diagnostics (client-side stage where the request failed).
+    "photo_resize_fail", "photo_net_upload", "photo_net_wait", "photo_slow",
     "calibration_step", "calibration_reset", "calibration_error", "calibration_skip_partial",
 }
 

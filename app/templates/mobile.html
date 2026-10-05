@@ -243,6 +243,7 @@
     <button class="ghost" onclick="showManual()" style="margin-top:4px">Wpisz wartości ręcznie</button>
     <button class="ghost" onclick="toggleSavedMeals()" style="margin-top:4px">Moje posiłki ▼</button>
     <p class="muted" id="msg"></p>
+    <p class="muted" id="msg-step" style="margin:-6px 0 0"></p>
   </section>
   <section class="card" id="saved-meals-panel" style="display:none">
     <h2>Moje posiłki</h2>
@@ -493,17 +494,26 @@ if ("serviceWorker" in navigator) {
 function downscale(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 1280, s = Math.min(1, MAX / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      c.toBlob(blob => { URL.revokeObjectURL(img.src); resolve(blob); }, "image/jpeg", 0.82);
+      try {
+        const MAX = 1280, s = Math.min(1, MAX / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(blob => {
+          URL.revokeObjectURL(url);
+          // toBlob gives null when the canvas could not be allocated (iOS memory limits).
+          blob ? resolve(blob) : reject(new Error("toBlob returned null"));
+        }, "image/jpeg", 0.82);
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
     };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image decode failed")); };
+    img.src = url;
   });
 }
+const fmtSize = (n) => n >= 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " MB"
+                                    : Math.round(n / 1024) + " kB";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r0 = (v) => Math.round(v || 0);
@@ -654,6 +664,38 @@ async function apiJson(path, body, method = "POST") {
 }
 async function apiForm(path, formData) {
   return api(path, {method: "POST", body: formData});
+}
+/** POST multipart przez XHR — jedyny sposób na postęp wysyłania. `onStage` dostaje
+ * "upload" (z `pct`) i "wait" (ciało wysłane, czekamy na serwer/model). Błąd sieci
+ * niesie `err.stage`, żeby było wiadomo, na którym etapie zerwało połączenie. */
+function apiFormStaged(path, formData, onStage) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let stage = "upload";
+    const fail = (message) => { const e = new Error(message); e.stage = stage; e.network = true; reject(e); };
+    xhr.open("POST", path);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) onStage("upload", Math.round(100 * ev.loaded / ev.total));
+    };
+    xhr.upload.onload = () => { stage = "wait"; onStage("wait", 100); };
+    xhr.onerror = () => fail("network error");
+    xhr.onabort = () => fail("aborted");
+    xhr.ontimeout = () => fail("timeout");
+    xhr.timeout = 150000;
+    xhr.onload = () => {
+      if (xhr.status === 401) { location.href = "/login"; reject(new Error("not logged in")); return; }
+      const t = xhr.responseText || "";
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const err = new Error(`HTTP ${xhr.status}: ${t.slice(0, 200)}`);
+        err.status = xhr.status;
+        try { err.detail = JSON.parse(t).detail; } catch (_) { err.detail = null; }
+        reject(err); return;
+      }
+      try { resolve(JSON.parse(t)); } catch (_) { resolve(t); }
+    };
+    xhr.send(formData);
+  });
 }
 
 function track(event) {
@@ -997,21 +1039,46 @@ async function saveWeighIn() {
 async function estimate() {
   refreshMealWhen();
   const msg = document.getElementById("msg");
+  const step = document.getElementById("msg-step");
   const file = document.getElementById("f-photo").files[0];
   const desc = document.getElementById("f-desc").value.trim();
   if (!file && !desc) { msg.textContent = "Dodaj zdjęcie albo opis."; return; }
   krasnalSays(msg, KRASNAL_STATUS.estimating);
+  step.textContent = "";
+  let waitTimer = null, waitStarted = 0;
+  const onStage = (stage, pct) => {
+    if (stage === "upload") {
+      step.textContent = `Wysyłam zdjęcie… ${pct}%`;
+    } else if (!waitTimer) {
+      waitStarted = Date.now();
+      const tick = () => {
+        const s = Math.round((Date.now() - waitStarted) / 1000);
+        step.textContent = `Czekam na model… ${s} s`;
+      };
+      tick();
+      waitTimer = setInterval(tick, 1000);
+    }
+  };
   try {
     let est;
     if (file) {
       const fd = new FormData();
-      let blob;
-      try { blob = await downscale(file); } catch(e) { blob = file; }
+      let blob = file;
+      step.textContent = "Zmniejszam zdjęcie…";
+      try {
+        const small = await downscale(file);
+        if (small.size < file.size) blob = small;
+        step.textContent = `Zmniejszam zdjęcie… ${fmtSize(file.size)} → ${fmtSize(blob.size)}`;
+      } catch (e) {
+        track("photo_resize_fail");
+        step.textContent = `Nie udało się zmniejszyć zdjęcia — wysyłam oryginał (${fmtSize(file.size)})`;
+      }
       fd.append("photo", blob, "photo.jpg");
       if (document.getElementById("f-note").value.trim()) fd.append("note", document.getElementById("f-note").value.trim());
       const day = document.getElementById("f-date").value;
       if (day) fd.append("day", day);
-      est = await apiForm("/api/meals/photo", fd);
+      est = await apiFormStaged("/api/meals/photo", fd, onStage);
+      if (waitStarted && Date.now() - waitStarted > 30000) track("photo_slow");
     } else {
       const fd = new FormData();
       fd.append("description", desc);
@@ -1024,7 +1091,17 @@ async function estimate() {
     resetAddForm();
     msg.textContent = "";
   } catch (e) {
-    msg.textContent = "Nie udało się oszacować: " + e.message;
+    if (e.network) {
+      track(e.stage === "upload" ? "photo_net_upload" : "photo_net_wait");
+      msg.textContent = e.stage === "upload"
+        ? "Nie udało się wysłać zdjęcia — połączenie zerwane podczas wysyłania. Spróbuj ponownie."
+        : "Połączenie zerwane podczas czekania na model. Zdjęcie mogło dojść — sprawdź kolejkę przed ponowną próbą.";
+    } else {
+      msg.textContent = "Nie udało się oszacować: " + e.message;
+    }
+  } finally {
+    if (waitTimer) clearInterval(waitTimer);
+    step.textContent = "";
   }
 }
 
