@@ -13,6 +13,7 @@ W trybie auto wybierany jest gemini, jeśli jego klucz jest ustawiony, inaczej c
 import base64
 import logging
 import os
+import time
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -21,6 +22,11 @@ from ..config import GEMINI_MODELS, LLM_BACKEND, VISION_MODEL
 from . import crypto
 
 logger = logging.getLogger(__name__)
+
+# A hung provider call must not hold the user (or the queue worker) forever:
+# one model gets PER_MODEL_TIMEOUT_S, the whole Gemini cascade TOTAL_DEADLINE_S.
+PER_MODEL_TIMEOUT_S = 30
+TOTAL_DEADLINE_S = 75
 
 MEDIA_TYPES = {
     "jpg": "image/jpeg",
@@ -148,7 +154,10 @@ def _estimate_claude(
     import anthropic
 
     try:
-        client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
+        kwargs = {"timeout": float(PER_MODEL_TIMEOUT_S * 2), "max_retries": 1}
+        if api_key:
+            kwargs["api_key"] = api_key
+        client = anthropic.Anthropic(**kwargs)
         client._validate_headers({}, {})  # wymusza rozwiązanie uwierzytelnienia
     except TypeError as exc:
         raise MealVisionNotConfigured(
@@ -199,7 +208,10 @@ def _estimate_gemini(
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=key)
+    client = genai.Client(
+        api_key=key,
+        http_options=types.HttpOptions(timeout=PER_MODEL_TIMEOUT_S * 1000),  # ms
+    )
     contents: list = []
     if image_bytes is not None:
         contents.append(types.Part.from_bytes(data=image_bytes, mime_type=media_type))
@@ -211,7 +223,12 @@ def _estimate_gemini(
     )
 
     last_exc: Exception = RuntimeError("Brak modeli Gemini do wypróbowania (GEMINI_MODELS).")
+    deadline = time.monotonic() + TOTAL_DEADLINE_S
     for model in GEMINI_MODELS:
+        if time.monotonic() > deadline:
+            logger.warning("Gemini: przekroczono łączny limit %s s — przerywam kaskadę.",
+                           TOTAL_DEADLINE_S)
+            break
         try:
             response = client.models.generate_content(model=model, contents=contents, config=config)
             estimate = response.parsed

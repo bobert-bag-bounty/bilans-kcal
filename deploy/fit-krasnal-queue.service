@@ -12,6 +12,8 @@ WorkingDirectory=/opt/fit-krasnal
 # skrypt nie ma FIT_KRASNAL_ENC_KEY i nie odszyfruje kluczy LLM użytkowników.
 EnvironmentFile=/etc/fit-krasnal/env
 
+# A hung model call blocked the timer for 3 weeks (oneshot never finished).
+RuntimeMaxSec=300
 ExecStart=/opt/fit-krasnal/.venv/bin/python /opt/fit-krasnal/scripts/process_meal_queue.py
 
 # Ograniczenie uprawnień procesu (jak fit-krasnal.service).
