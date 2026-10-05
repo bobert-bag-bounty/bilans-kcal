@@ -198,6 +198,30 @@
     </div>
     <p class="muted" id="w-status" style="margin:4px 0 0"></p>
   </section>
+  <section class="card" id="draft" style="display:none">
+    <h2 id="d-title">Szacunek — sprawdź i popraw</h2>
+    <input type="text" id="d-desc" placeholder="Opis posiłku"
+           style="font-size:15px;font-weight:600;margin-bottom:6px">
+    <div id="d-llm-details">
+      <div id="d-items" class="muted" style="margin-bottom:6px"></div>
+      <ul id="d-assumptions" class="muted"></ul>
+    </div>
+    <div class="row2">
+      <span style="flex:1"><label>kcal</label><input type="number" id="d-kcal"></span>
+      <span style="flex:1"><label>białko g</label><input type="number" step="0.1" id="d-protein"></span>
+    </div>
+    <div class="row2">
+      <span style="flex:1"><label>tłuszcz g</label><input type="number" step="0.1" id="d-fat"></span>
+      <span style="flex:1"><label>węgle g</label><input type="number" step="0.1" id="d-carbs"></span>
+    </div>
+    <div class="row2">
+      <span style="flex:1"><label>błonnik g</label><input type="number" step="0.1" id="d-fiber" value="0"></span>
+      <span style="flex:1"><label>cukry wolne g</label><input type="number" step="0.1" id="d-sugars" value="0"></span>
+    </div>
+    <p class="muted" id="d-range"></p>
+    <button class="ghost sm" id="save-to-my-meals-btn" onclick="saveToMyMeals()" style="margin-bottom:6px">Zapisz w moich posiłkach</button>
+    <button class="primary" onclick="saveDraft()">Zapisz posiłek</button>
+  </section>
   <section class="card">
     <h2>Dodaj posiłek</h2>
     <div class="row2">
@@ -223,30 +247,6 @@
   <section class="card" id="saved-meals-panel" style="display:none">
     <h2>Moje posiłki</h2>
     <div id="saved-meals-list"><p class="muted">Ładowanie…</p></div>
-  </section>
-  <section class="card" id="draft" style="display:none">
-    <h2 id="d-title">Szacunek — sprawdź i popraw</h2>
-    <input type="text" id="d-desc" placeholder="Opis posiłku"
-           style="font-size:15px;font-weight:600;margin-bottom:6px">
-    <div id="d-llm-details">
-      <div id="d-items" class="muted" style="margin-bottom:6px"></div>
-      <ul id="d-assumptions" class="muted"></ul>
-    </div>
-    <div class="row2">
-      <span style="flex:1"><label>kcal</label><input type="number" id="d-kcal"></span>
-      <span style="flex:1"><label>białko g</label><input type="number" step="0.1" id="d-protein"></span>
-    </div>
-    <div class="row2">
-      <span style="flex:1"><label>tłuszcz g</label><input type="number" step="0.1" id="d-fat"></span>
-      <span style="flex:1"><label>węgle g</label><input type="number" step="0.1" id="d-carbs"></span>
-    </div>
-    <div class="row2">
-      <span style="flex:1"><label>błonnik g</label><input type="number" step="0.1" id="d-fiber" value="0"></span>
-      <span style="flex:1"><label>cukry wolne g</label><input type="number" step="0.1" id="d-sugars" value="0"></span>
-    </div>
-    <p class="muted" id="d-range"></p>
-    <button class="ghost sm" id="save-to-my-meals-btn" onclick="saveToMyMeals()" style="margin-bottom:6px">Zapisz w moich posiłkach</button>
-    <button class="primary" onclick="saveDraft()">Zapisz posiłek</button>
   </section>
 </div>
 
