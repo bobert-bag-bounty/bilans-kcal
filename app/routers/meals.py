@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -55,7 +56,7 @@ async def estimate_meal_photo(
     if len(data) > MAX_PHOTO_BYTES:
         raise HTTPException(413, "Zdjęcie za duże (limit 15 MB)")
     try:
-        data = meal_queue.downscale_photo(data)
+        data = await run_in_threadpool(meal_queue.downscale_photo, data)
     except Exception as exc:
         raise HTTPException(422, f"Nie można odczytać zdjęcia: {exc}")
     ext = "jpg"
@@ -64,9 +65,11 @@ async def estimate_meal_photo(
         return _queue_meal(db, user.id, target_day, "brak klucza LLM",
                            note=note, photo_bytes=data, error_kind="no_key")
     try:
-        estimate, model = meal_vision.estimate_from_photo(data, ext, note,
-                                                           gemini_key=keys.gemini,
-                                                           anthropic_key=keys.anthropic)
+        # Blocking provider call: off the event loop, so one slow photo does
+        # not freeze every other request of the single uvicorn worker.
+        estimate, model = await run_in_threadpool(
+            meal_vision.estimate_from_photo, data, ext, note,
+            gemini_key=keys.gemini, anthropic_key=keys.anthropic)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     except Exception as exc:
