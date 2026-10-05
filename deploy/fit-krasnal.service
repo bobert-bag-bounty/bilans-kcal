@@ -13,8 +13,11 @@ WorkingDirectory=/opt/fit-krasnal
 EnvironmentFile=/etc/fit-krasnal/env
 
 # Nasłuch TYLKO na loopbacku — z internetu wejście wyłącznie przez Caddy (HTTPS).
-ExecStart=/opt/fit-krasnal/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8321
+ExecStart=/opt/fit-krasnal/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8321 --timeout-graceful-shutdown 10
 
+# Deploy restarts used to hang until systemd's 90 s SIGKILL because open
+# connections kept uvicorn from exiting.
+TimeoutStopSec=20
 Restart=always
 RestartSec=3
 

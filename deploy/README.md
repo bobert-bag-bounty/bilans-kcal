@@ -98,6 +98,35 @@ z dysku przy każdym żądaniu, więc nie trzeba go przeładowywać).
 caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
 ```
 
+### Log dostępowy (diagnoza „network error” przy zdjęciach)
+
+W bloku `fit.krasnal.cc` dopisz, żeby widzieć czas i status każdego żądania
+(także przerwanych przez telefon):
+
+```
+	log {
+		output file /var/log/caddy/fit-access.log {
+			roll_size 10mb
+			roll_keep 3
+			roll_keep_for 720h
+		}
+		format json
+	}
+```
+
+`roll_keep_for 720h` = 30 dni, zgodnie z retencją z `/prywatnosc` (log zawiera IP).
+Szukanie zerwanych wysyłek: `sudo grep '/api/meals/photo' /var/log/caddy/fit-access.log | jq -c '{ts,status,duration,size,ua:.request.headers["User-Agent"][0]}'`
+(`status` 0/502 + `size` 0 = telefon nie dosłał ciała żądania).
+
+### Zmiana plików systemd
+
+`deploy.sh` **nie** podmienia plików jednostek. Po zmianie `deploy/*.service`:
+
+```bash
+sudo cp /opt/fit-krasnal/deploy/fit-krasnal.service /opt/fit-krasnal/deploy/fit-krasnal-queue.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl restart fit-krasnal
+```
+
 `basic_auth` to **tymczasowa** kłódka na czas, gdy aplikacja nie ma jeszcze
 własnego logowania. Po skończeniu multi-user auth usuń ten blok.
 
