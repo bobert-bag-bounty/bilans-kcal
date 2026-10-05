@@ -665,6 +665,25 @@ async function apiJson(path, body, method = "POST") {
 async function apiForm(path, formData) {
   return api(path, {method: "POST", body: formData});
 }
+/** Trzyma ekran włączony na czas długiego żądania (Wake Lock API; Chrome i Firefox
+ * ≥126 na Androidzie). Wygaszony ekran zamraża stronę i zrywa wysyłkę zdjęcia.
+ * Blokada sama znika, gdy karta traci pierwszy plan — zakładamy ją znowu po
+ * powrocie. Brak API / odmowa = po cichu działamy bez niej. Zwraca funkcję zwalniającą. */
+async function holdScreenAwake() {
+  if (!("wakeLock" in navigator)) return () => {};
+  let lock = null, released = false;
+  const acquire = async () => {
+    try { lock = await navigator.wakeLock.request("screen"); } catch (_) { lock = null; }
+  };
+  const onVisible = () => { if (!released && document.visibilityState === "visible") acquire(); };
+  document.addEventListener("visibilitychange", onVisible);
+  await acquire();
+  return () => {
+    released = true;
+    document.removeEventListener("visibilitychange", onVisible);
+    if (lock) lock.release().catch(() => {});
+  };
+}
 /** POST multipart przez XHR — jedyny sposób na postęp wysyłania. `onStage` dostaje
  * "upload" (z `pct`) i "wait" (ciało wysłane, czekamy na serwer/model). Błąd sieci
  * niesie `err.stage`, żeby było wiadomo, na którym etapie zerwało połączenie. */
@@ -1045,6 +1064,7 @@ async function estimate() {
   if (!file && !desc) { msg.textContent = "Dodaj zdjęcie albo opis."; return; }
   krasnalSays(msg, KRASNAL_STATUS.estimating);
   step.textContent = "";
+  const releaseScreen = await holdScreenAwake();
   let waitTimer = null, waitStarted = 0;
   const onStage = (stage, pct) => {
     if (stage === "upload") {
@@ -1100,6 +1120,7 @@ async function estimate() {
       msg.textContent = "Nie udało się oszacować: " + e.message;
     }
   } finally {
+    releaseScreen();
     if (waitTimer) clearInterval(waitTimer);
     step.textContent = "";
   }
