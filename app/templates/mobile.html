@@ -694,10 +694,18 @@ function apiFormStaged(path, formData, onStage) {
     const fail = (message) => { const e = new Error(message); e.stage = stage; e.network = true; reject(e); };
     xhr.open("POST", path);
     xhr.withCredentials = true;
+    // Body fully sent -> waiting for the server. Several signals can say so (Firefox
+    // delivers `upload.onload` late or after the last progress event), so the
+    // switch is idempotent and does not depend on any single one of them.
+    const toWait = () => { if (stage === "upload") { stage = "wait"; onStage("wait", 100); } };
     xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable) onStage("upload", Math.round(100 * ev.loaded / ev.total));
+      if (stage !== "upload" || !ev.lengthComputable) return;
+      if (ev.loaded >= ev.total) toWait();
+      else onStage("upload", Math.round(100 * ev.loaded / ev.total));
     };
-    xhr.upload.onload = () => { stage = "wait"; onStage("wait", 100); };
+    xhr.upload.onload = toWait;
+    xhr.upload.onloadend = toWait;
+    xhr.onreadystatechange = () => { if (xhr.readyState >= 2) toWait(); };
     xhr.onerror = () => fail("network error");
     xhr.onabort = () => fail("aborted");
     xhr.ontimeout = () => fail("timeout");
@@ -1068,7 +1076,7 @@ async function estimate() {
   let waitTimer = null, waitStarted = 0;
   const onStage = (stage, pct) => {
     if (stage === "upload") {
-      step.textContent = `Wysyłam zdjęcie… ${pct}%`;
+      if (!waitTimer) step.textContent = `Wysyłam zdjęcie… ${pct}%`;
     } else if (!waitTimer) {
       waitStarted = Date.now();
       const tick = () => {
