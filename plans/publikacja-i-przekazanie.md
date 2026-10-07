@@ -106,7 +106,7 @@ Gmail — przeniesienie to zmiana IAM i billingu, projekt zostaje ten sam.
 3. Przez IAP: `sudo FIT_DOMAIN=<host> bash deploy/setup-vm.sh`
    (`FIT_REPO_URL`, jeśli nie fork). Klient OAuth w GUI z redirect
    `https://<host>/auth/google/callback` → `/etc/fit-krasnal/env`.
-4. **Dane:** skopiować `/opt/fit-krasnal/data/` (SQLite + zdjęcia) **razem z
+4. **Dane:** skopiować `/var/lib/fit-krasnal/` (SQLite + zdjęcia) **razem z
    `FIT_KRASNAL_ENC_KEY`** ze starego env — bez klucza zaszyfrowane ustawienia
    userów (tokeny Garmin/Strava, klucze LLM) są nie do odczytu.
 5. APK: `FIT_KRASNAL_APP_URL=https://<host> npx cap sync android` + build +
@@ -130,7 +130,7 @@ wystawi nowy certyfikat.
 | Allowlista logowania (metadane VM) | zostaje; dopisz siebie | w tfvars |
 | Bucket APK + IAM czytelników | zostaje; dopisz siebie | nowa nazwa bucketu |
 | Sekrety w `/etc/fit-krasnal/env` (sesja, ENC_KEY, OAuth) | zostają na dysku; rotacja opcjonalna | nowe (setup-vm.sh generuje), ENC_KEY **skopiować** jeśli przenosisz dane |
-| Baza i zdjęcia `/opt/fit-krasnal/data/` | zostają | skopiować |
+| Baza i zdjęcia `/var/lib/fit-krasnal/` | zostają | skopiować |
 | Stan Terraforma + tfvars | przekazać poza repo | nowy |
 | Dostęp SSH | tylko IAP + OS Login; `roles/owner` wystarcza | j.w. |
 | Certyfikat TLS | Caddy odnawia sam | j.w. |
