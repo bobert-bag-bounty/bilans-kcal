@@ -135,6 +135,16 @@ sudo systemctl restart fit-krasnal
 
 ## 2. Klucz SSH dla GitHub Actions
 
+> **W wariancie Terraform (sekcja 0) ten krok nie ma zastosowania.** Firewall
+> dopuszcza port 22 **tylko** z zakresu IAP (`35.235.240.0/20`) — o ile
+> usunięto regułę `default-allow-ssh` (sekcja 0) — więc runner GitHub Actions
+> nie dosięgnie VM i automatyczny deploy przez SSH nie zadziała.
+> Zamiast niego wdrażaj ręcznie tunelem IAP:
+> `gcloud compute ssh <vm> --tunnel-through-iap --zone <zone> --command 'bash /opt/fit-krasnal/deploy/deploy.sh'`.
+> Otwarcie 22 dla GitHuba (dodatkowa reguła firewalla na IP runnerów i klucz
+> jak niżej) to **świadoma decyzja**, nie stan domyślny. Poniższy podrozdział
+> opisuje właśnie ten wariant z otwartym 22.
+
 **Na swoim komputerze** (nie na VM) wygeneruj parę tylko do deployu:
 
 ```bash

@@ -30,7 +30,7 @@ Skróty: `npm run sync`, `npm run build`.
 
 | Zmienna | Znaczenie |
 |---|---|
-| `FIT_KRASNAL_APP_URL` | URL ładowany w WebView. Domyślnie `https://fit.krasnal.cc`. Dla testów w LAN: `FIT_KRASNAL_APP_URL=http://192.168.1.10:8000 npx cap sync android` — wtedy config włącza `cleartext` i mixed content. |
+| `FIT_KRASNAL_APP_URL` | URL ładowany w WebView. Domyślnie `https://fit.krasnal.cc`. Dla testów w LAN: `FIT_KRASNAL_APP_URL=http://<IP-LAN>:8000 npx cap sync android` — wtedy config włącza `cleartext` i mixed content. |
 
 Zmiana URL wymaga ponownego `npx cap sync android` i przebudowy APK.
 
@@ -51,7 +51,7 @@ Minimalny Android: **8.0 (API 26)** — wymaga tego biblioteka Health Connect.
 | `@capacitor/haptics` | wibracja przy zapisie |
 | `@capacitor/app` | zdarzenia tła/pierwszego planu, przycisk Wstecz |
 | `@capacitor/status-bar` | kolor paska statusu |
-| `capacitor-health` | Health Connect: odczyt **kroków** i **wagi** (`READ_STEPS`, `READ_WEIGHT`) + ekran uzasadnienia uprawnień |
+| `capacitor-health` | Health Connect: odczyt **kroków** (`READ_STEPS`) + ekran uzasadnienia uprawnień. **Waga** (`READ_WEIGHT`) jest tylko zadeklarowana w manifeście — brak kodu czytającego (planowane) |
 
 Identyfikator aplikacji: `cc.krasnal.fit`. Ikona launchera pochodzi
 z `app/static/icon-512.png`.
