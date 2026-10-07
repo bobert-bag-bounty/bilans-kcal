@@ -10,6 +10,14 @@ Złożoność 1–10: **1** = wpisanie punktu zajmuje tyle co zrobienie, **3** k
 godzin, **5** wieczór–dzień, **7** kilka dni, **10** tygodnie + rzeczy poza
 kodem. Zrealizowane punkty → [DONE.md](DONE.md) (indeks) + `archive/`.
 
+## Publikacja forka i przekazanie autorowi (lista kontrolna, 3/10)
+
+→ [plans/publikacja-i-przekazanie.md](plans/publikacja-i-przekazanie.md).
+Tylko dla forka: wyłączenie Actions, pełna suita przed pushem, tanie resztki
+(klient OAuth, waga z Health Connect, luki w docs), mapa repo pod czytanie,
+szybki start przeniesienia projektu GCP i ściąga dla autora. Decyzje autora
+przy scaleniu do upstreamu (bump noty prywatności, utwardzenie) w sekcji F.
+
 ## Pochodne naprawy czerwonego CI z 2026-09-06
 
 Hotfix zrobiony (DONE.md „Testy: «dziś» ze strefy użytkownika…"); zostało:
