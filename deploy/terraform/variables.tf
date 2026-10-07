@@ -79,3 +79,9 @@ variable "iap_ssh_range" {
   type        = string
   default     = "35.235.240.0/20"
 }
+
+variable "oauth_secret_name" {
+  description = "Nazwa sekretu w Secret Manager z klientem OAuth Google (payload: dwie linie FIT_KRASNAL_GOOGLE_CLIENT_ID=… / FIT_KRASNAL_GOOGLE_CLIENT_SECRET=…). Wersję dodaje operator, nie Terraform."
+  type        = string
+  default     = "fit-krasnal-oauth"
+}

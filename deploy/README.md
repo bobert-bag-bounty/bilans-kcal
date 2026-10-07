@@ -40,6 +40,10 @@ przed `apply`, żeby stan się zgadzał:
 ```bash
 terraform import -var-file=... 'google_project_service.apis["compute.googleapis.com"]' <project>/compute.googleapis.com
 terraform import -var-file=... google_compute_address.ip projects/<project>/regions/<region>/addresses/<nazwa>
+# sekret OAuth utworzony wcześniej ręcznie (gcloud secrets create …) i jego binding:
+terraform import -var-file=... google_secret_manager_secret.oauth projects/<project>/secrets/fit-krasnal-oauth
+terraform import -var-file=... google_secret_manager_secret_iam_member.oauth_vm_accessor \
+  "projects/<project>/secrets/fit-krasnal-oauth roles/secretmanager.secretAccessor serviceAccount:<sa-email>"
 ```
 
 SSH wyłącznie tunelem IAP (output `ssh_command`):
@@ -250,6 +254,77 @@ wartości nie ma w repo, wszystko przez zmienne środowiskowe w
 W konsoli Google (APIs & Services → Credentials) adres zwrotny (redirect URI)
 klienta musi być dokładnie `<FIT_KRASNAL_PUBLIC_URL>/auth/google/callback`.
 Konto usługi VM potrzebuje roli `roles/aiplatform.user`, jeśli używasz Vertex AI.
+
+### Klient OAuth w Secret Manager
+
+Klient OAuth nie leży w repo ani w stanie Terraforma. Terraform
+(`deploy/terraform`) tworzy tylko pusty sekret o nazwie z `var.oauth_secret_name`
+(domyślnie `fit-krasnal-oauth`) i daje kontu usługi VM rolę
+`roles/secretmanager.secretAccessor`. Wersję sekretu dodaje operator; payload
+to dokładnie dwie linie w formacie pliku env:
+
+```
+FIT_KRASNAL_GOOGLE_CLIENT_ID=...
+FIT_KRASNAL_GOOGLE_CLIENT_SECRET=...
+```
+
+Na VM wczytuje je skrypt [`deploy/load-oauth-secret.sh`](load-oauth-secret.sh).
+Root uruchamia **kopię spoza checkoutu** (`/opt/fit-krasnal` należy do
+użytkownika usługi, który robi tam `git pull` — skrypt z checkoutu mógłby
+zostać podmieniony). `gcloud` jest na obrazie Debiana z GCE; skrypt używa go
+z pustym `CLOUDSDK_CONFIG`, więc widzi tylko konto usługi VM z serwera
+metadanych (projekt też stamtąd). Pobiera wersję `latest` do pliku 0600 na
+tmpfs, sprawdza — bez wypisywania wartości — że są dokładnie dwie linie
+`ID`/`SECRET` ze znakami `[A-Za-z0-9._-]`, podmienia w `/etc/fit-krasnal/env`
+dwie puste linie zostawione przez `setup-vm.sh` (zachowując
+`root:fitkrasnal 640`) i restartuje usługę:
+
+```bash
+sudo install -o root -g root -m 0755 /opt/fit-krasnal/deploy/load-oauth-secret.sh /usr/local/sbin/load-oauth-secret
+sudo /usr/local/sbin/load-oauth-secret            # [nazwa-sekretu], domyślnie fit-krasnal-oauth
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' <FIT_KRASNAL_PUBLIC_URL>/auth/google
+# 302 https://accounts.google.com/… = OK; 503 = brak klienta w env; 404 = FIT_KRASNAL_AUTH bez oidc
+```
+
+Nie wypisuj zawartości sekretu na terminal (`cat`, `gcloud … access` bez
+przekierowania); sprawdzaj obecność, nie wartości:
+`sudo grep -c '^FIT_KRASNAL_GOOGLE_CLIENT_\(ID\|SECRET\)=.' /etc/fit-krasnal/env` → `2`.
+
+Sekret ma `prevent_destroy`: zmiana jego nazwy albo replikacji wymaga
+świadomego usunięcia tego bloku (stare wersje przepadają), zmiana etykiety
+zasobu w HCL — `terraform state mv`.
+
+### Kreator: klient OAuth i wersja sekretu (konsola, działa z telefonu)
+
+Etykiety podane po angielsku (konsola w tym języku jest stabilniejsza; po
+polsku są tłumaczone 1:1). Wklejanie z telefonu: uważaj na autokorektę
+i „inteligentne" cudzysłowy — skrypt z poprzedniego podrozdziału odrzuci
+payload, w którym brakuje którejś linii, ale nie wykryje literówki w wartości.
+
+1. https://console.cloud.google.com/auth/overview → wybierz projekt → jeśli
+   to pierwszy raz: *Get started* → App name „Fit Krasnal", support e-mail,
+   Audience **External**, contact e-mail → *Create*. Potem *Audience* →
+   *Test users* → *Add users* → e-maile z allowlisty (w trybie *Testing*
+   tylko oni mogą się zalogować). Zakresów (*Data access*) nie dodawaj —
+   `openid email profile` są domyślne.
+2. https://console.cloud.google.com/auth/clients → *+ Create client* →
+   Application type **Web application**, Name np. „fit-krasnal-web".
+3. *Authorized redirect URIs* → *+ Add URI* → dokładnie
+   `<FIT_KRASNAL_PUBLIC_URL>/auth/google/callback` (ten sam host, co
+   `FIT_KRASNAL_PUBLIC_URL`, `https`, bez ukośnika na końcu). *Authorized
+   JavaScript origins* zostaw puste. *Create*.
+4. W oknie „OAuth client created" skopiuj *Client ID* i *Client secret*
+   (sekret widać też później w szczegółach klienta). Nie pobieraj pliku JSON;
+   jeśli pobrałeś — usuń go po wklejeniu do Secret Managera.
+5. https://console.cloud.google.com/security/secret-manager → sekret
+   `fit-krasnal-oauth` (istnieje po `terraform apply`) → *+ New version*.
+6. *Secret value* → wklej dokładnie dwie linie
+   `FIT_KRASNAL_GOOGLE_CLIENT_ID=<id>` i
+   `FIT_KRASNAL_GOOGLE_CLIENT_SECRET=<sekret>` (bez spacji wokół `=`, bez
+   cudzysłowów, każda w osobnej linii) → *Add new version*.
+7. Na VM: komenda z `terraform output oauth_secret_load_command` (kopia
+   skryptu do `/usr/local/sbin` + uruchomienie). Test:
+   `<FIT_KRASNAL_PUBLIC_URL>/login` → „Zaloguj przez Google".
 
 ## Onboarding testera
 

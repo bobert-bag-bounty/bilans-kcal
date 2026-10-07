@@ -154,3 +154,35 @@ resource "google_storage_bucket_iam_member" "apk_viewers" {
   role     = "roles/storage.objectViewer"
   member   = "user:${each.value}"
 }
+
+# ── Klient OAuth (Google) w Secret Manager ──────────────────────────────
+# Sam sekret (kontener) i uprawnienie odczytu dla konta VM są w Terraformie;
+# WERSJĘ (payload: dwie linie FIT_KRASNAL_GOOGLE_CLIENT_ID=… i
+# FIT_KRASNAL_GOOGLE_CLIENT_SECRET=…) dodaje operator ręcznie, żeby wartości
+# nigdy nie trafiły do stanu Terraforma. Instrukcja: deploy/README.md,
+# sekcja „Wariant GCP z logowaniem Google"; komenda do VM: output
+# `oauth_secret_load_command`.
+resource "google_secret_manager_secret" "oauth" {
+  secret_id = var.oauth_secret_name
+
+  replication {
+    auto {}
+  }
+
+  # Wersję z kluczem dodał operator ręcznie — `terraform destroy` nie może
+  # jej skasować po cichu (jak google_compute_address.ip). Uwaga: blokuje też
+  # replacement: zmiana `var.oauth_secret_name` lub replikacji = nowy sekret,
+  # więc najpierw świadomie usuń ten blok (wersje przepadają); zmiana etykiety
+  # zasobu w HCL = `terraform state mv`.
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_iam_member" "oauth_vm_accessor" {
+  secret_id = google_secret_manager_secret.oauth.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.vm.email}"
+}

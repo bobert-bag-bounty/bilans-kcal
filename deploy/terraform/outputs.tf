@@ -34,3 +34,8 @@ output "apk_download_url" {
 output "apk_upload_command" {
   value = "gcloud storage cp android-app/dist/fit-krasnal-debug.apk gs://${google_storage_bucket.apk.name}/fit-krasnal.apk"
 }
+
+output "oauth_secret_load_command" {
+  description = "Do uruchomienia na VM: kopiuje loader poza checkout (root-owned) i pobiera klienta OAuth z Secret Manager (gcloud z konta usługi VM), podmienia linie w /etc/fit-krasnal/env i restartuje usługę. Nie wypisuje wartości sekretu."
+  value       = "sudo install -o root -g root -m 0755 /opt/fit-krasnal/deploy/load-oauth-secret.sh /usr/local/sbin/load-oauth-secret && sudo /usr/local/sbin/load-oauth-secret ${google_secret_manager_secret.oauth.secret_id}"
+}
