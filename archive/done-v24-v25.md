@@ -12,8 +12,10 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
   przeglądarce (`Bridge.launchIntent` → `ACTION_VIEW` dla hosta spoza
   `allowNavigation`), więc sesja po OIDC lądowała w Chrome, nie w aplikacji.
   Fix: `accounts.google.com` w `server.allowNavigation` (`capacitor.config.ts`);
-  bump Y, bo zmienia się miejsce logowania. Zweryfikowane do kroku z hasłem —
-  callback i sesja w WebView do sprawdzenia z prawdziwym klientem.
+  bump Y, bo zmienia się miejsce logowania. Zweryfikowane na telefonie
+  z prawdziwym klientem: hasło → zgoda → callback → sesja w WebView →
+  zdjęcie z galerii → Vertex (`gemini-2.5-flash`; 3.5-flash zwracał 404
+  w `europe-west1` 2026-10-08, patrz deploy/README.md).
 - **UA bez zmian:** test na telefonie (DevTools, prawdziwy UA WebView „; wv",
   klient „Web application") doszedł do kroku z hasłem bez
   `disallowed_useragent` — `overrideUserAgent` zostaje jako opisane w README

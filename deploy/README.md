@@ -250,6 +250,7 @@ wartości nie ma w repo, wszystko przez zmienne środowiskowe w
 | `FIT_KRASNAL_ALLOWED_EMAILS` | lista e-maili (małe litery, po przecinku), którym wolno się zalogować |
 | `FIT_KRASNAL_ALLOWED_HOSTS` | lista hostów akceptowanych w nagłówku `Host` (domyślnie `*`) |
 | `FIT_KRASNAL_VERTEX_PROJECT` / `_LOCATION` | Gemini przez Vertex AI z konta serwera (ADC), bez kluczy API; region domyślnie `europe-west1` |
+| `FIT_KRASNAL_GEMINI_MODEL` | model Gemini (kod domyślnie `gemini-3.5-flash`; ustaw jawnie na VM). Obserwacja 2026-10-08: w `europe-west1` `gemini-3.5-flash` zwracał `404 Publisher model … was not found`, `gemini-2.5-flash` działał. Proces WWW przy błędzie LLM po cichu odkłada posiłek do kolejki — treść błędu zobaczysz w `journalctl -u fit-krasnal-queue`. Zmieniaj model, nie region na `global`: nota prywatności obiecuje przetwarzanie w UE |
 
 W konsoli Google (APIs & Services → Credentials) adres zwrotny (redirect URI)
 klienta musi być dokładnie `<FIT_KRASNAL_PUBLIC_URL>/auth/google/callback`.
