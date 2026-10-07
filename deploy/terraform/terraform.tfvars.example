@@ -1,4 +1,4 @@
-# Skopiuj do ~/bilans-kcal-infra/terraform.tfvars (POZA repo) i uzupełnij.
+# Skopiuj do terraform.tfvars w tym katalogu (plik jest w .gitignore) i uzupełnij.
 project_id     = "my-gcp-project"
 region         = "us-central1"
 zone           = "us-central1-a"

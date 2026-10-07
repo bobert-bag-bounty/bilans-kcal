@@ -22,15 +22,16 @@ konto usługi VM (tylko `roles/aiplatform.user` + `roles/logging.logWriter`,
 bez kluczy), regionalny adres statyczny (tier STANDARD), reguły firewalla
 (80/443 z internetu, 22 **tylko** z zakresu IAP `35.235.240.0/20`) i VM
 `e2-micro` (free tier w `us-central1`, 30 GB pd-standard, Debian 12,
-Shielded VM, OS Login). **Prawdziwe wartości (`terraform.tfvars`) i stan
-trzymaj poza repo**, np. w `~/bilans-kcal-infra/`:
+Shielded VM, OS Login). **Prawdziwe wartości (`terraform.tfvars`), stan i
+notatki (`NOTES.local.md`) leżą obok konfiguracji w `deploy/terraform/` i są
+w `.gitignore`** — nigdy nie trafiają do repo:
 
 ```bash
-cp deploy/terraform/terraform.tfvars.example ~/bilans-kcal-infra/terraform.tfvars   # uzupełnij
 cd deploy/terraform
-terraform init -backend-config="path=$HOME/bilans-kcal-infra/terraform.tfstate"
-terraform plan  -var-file=$HOME/bilans-kcal-infra/terraform.tfvars
-terraform apply -var-file=$HOME/bilans-kcal-infra/terraform.tfvars
+cp terraform.tfvars.example terraform.tfvars      # uzupełnij
+terraform init -backend-config="path=terraform.tfstate"
+terraform plan  -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
 ```
 
 Jeśli adres statyczny albo API istniały wcześniej (ręcznie), zaimportuj je
