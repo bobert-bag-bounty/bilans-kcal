@@ -13,7 +13,8 @@
 #   FIT_ALLOWED_EMAILS, FIT_AUTH, FIT_LLM, FIT_VERTEX_PROJECT,
 #   FIT_VERTEX_LOCATION — opcjonalne; jeśli podane przy PIERWSZYM uruchomieniu,
 #                     trafiają do /etc/fit-krasnal/env. Później plik nie jest
-#                     nadpisywany (brakujące klucze są tylko dopisywane puste).
+#                     nadpisywany (brakujące klucze są tylko dopisywane:
+#                     puste, a FIT_KRASNAL_LLM=auto i FIT_KRASNAL_VERTEX_LOCATION=global).
 #   FIT_PYTHON        wersja Pythona dla venv (domyślnie 3.12; pyproject
 #                     wymaga >=3.12, Debian 12 ma 3.11 → instalowana przez uv).
 set -euo pipefail
@@ -118,10 +119,13 @@ FIT_KRASNAL_ALLOWED_EMAILS=${FIT_ALLOWED_EMAILS:-}
 FIT_KRASNAL_GOOGLE_CLIENT_ID=
 FIT_KRASNAL_GOOGLE_CLIENT_SECRET=
 
-# LLM: vertex (konto usługi VM, bez kluczy) | gemini | anthropic
-FIT_KRASNAL_LLM=${FIT_LLM:-}
+# LLM: auto | vertex (konto usługi VM, bez kluczy) | gemini | claude.
+# Pusta wartość zmiennej NIE oznacza domyślnej z kodu (nadpisuje ją pustym
+# stringiem), dlatego wpisujemy jawne domyślne. Region global: najnowsze
+# modele Gemini bywają dostępne tylko tam.
+FIT_KRASNAL_LLM=${FIT_LLM:-auto}
 FIT_KRASNAL_VERTEX_PROJECT=${FIT_VERTEX_PROJECT:-}
-FIT_KRASNAL_VERTEX_LOCATION=${FIT_VERTEX_LOCATION:-}
+FIT_KRASNAL_VERTEX_LOCATION=${FIT_VERTEX_LOCATION:-global}
 ENV
   echo "   utworzono $ENV_FILE (wygenerowano SECRET_KEY, ENC_KEY i USAGE_SALT)"
 else
@@ -130,7 +134,8 @@ else
              FIT_KRASNAL_ALLOWED_HOSTS FIT_KRASNAL_AUTH FIT_KRASNAL_ALLOWED_EMAILS \
              FIT_KRASNAL_GOOGLE_CLIENT_ID FIT_KRASNAL_GOOGLE_CLIENT_SECRET \
              FIT_KRASNAL_LLM FIT_KRASNAL_VERTEX_PROJECT FIT_KRASNAL_VERTEX_LOCATION; do
-    grep -q "^$key=" "$ENV_FILE" || { echo "$key=" >> "$ENV_FILE"; echo "   dopisano pusty $key — uzupełnij"; }
+    case $key in FIT_KRASNAL_LLM) def=auto ;; FIT_KRASNAL_VERTEX_LOCATION) def=global ;; *) def= ;; esac
+    grep -q "^$key=" "$ENV_FILE" || { echo "$key=$def" >> "$ENV_FILE"; echo "   dopisano $key=$def — uzupełnij, jeśli trzeba"; }
   done
 fi
 chown root:"$APP_USER" "$ENV_FILE"

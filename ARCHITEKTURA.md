@@ -146,8 +146,9 @@ env (np. z `setup-vm.sh`) **nadpisuje** domyślną, nie przywraca jej.
 `ADMIN_EMAIL` ma domyślną wartość `krasnal@krasnal.cc` wpisaną w kodzie — to
 konto admina upstreamu. Na forku ustaw `FIT_KRASNAL_ADMIN_EMAIL` na własny
 adres, inaczej `/usage` należy do konta upstreamu.
-`FIT_KRASNAL_GEMINI_MODEL`: domyślny `gemini-3.5-flash` zwracał 404 w
-`europe-west1` (2026-10-08) — na VM ustaw jawnie, patrz `deploy/README.md`.
+`FIT_KRASNAL_VERTEX_LOCATION`: domyślny `gemini-3.5-flash` zwracał 404 w
+`europe-west1` (2026-10-08), pod `global` działa — fork ustawia `global`,
+patrz `deploy/README.md`.
 
 ## Co czyta co: `usage.EVENTS` → gdzie emitowane
 
