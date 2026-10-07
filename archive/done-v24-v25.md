@@ -6,6 +6,29 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
+## Logowanie Google wewnątrz powłoki Android + klient OAuth w Secret Manager (25.6.0)
+
+- **Problem:** Capacitor otwierał `accounts.google.com` w zewnętrznej
+  przeglądarce (`Bridge.launchIntent` → `ACTION_VIEW` dla hosta spoza
+  `allowNavigation`), więc sesja po OIDC lądowała w Chrome, nie w aplikacji.
+  Fix: `accounts.google.com` w `server.allowNavigation` (`capacitor.config.ts`);
+  bump Y, bo zmienia się miejsce logowania. Zweryfikowane do kroku z hasłem —
+  callback i sesja w WebView do sprawdzenia z prawdziwym klientem.
+- **UA bez zmian:** test na telefonie (DevTools, prawdziwy UA WebView „; wv",
+  klient „Web application") doszedł do kroku z hasłem bez
+  `disallowed_useragent` — `overrideUserAgent` zostaje jako opisane w README
+  obejście na wypadek blokady; docelowo Chrome Custom Tabs + deep link.
+  Koszt `allowNavigation`: Google dostaje kanał `androidBridge` (README).
+- **Sekret OAuth:** `google_secret_manager_secret` + IAM `secretAccessor` dla
+  konta VM w Terraformie (zaimportowane, plan bez zmian, `prevent_destroy`);
+  wersję (2 linie env) dodaje operator w konsoli — kreator w `deploy/README.md`.
+- **`deploy/load-oauth-secret.sh`:** gcloud → plik tymczasowy 0600, walidacja
+  kształtu (2 linie, każdy klucz raz, bez białych znaków), podmiana linii
+  w `/etc/fit-krasnal/env` z zachowaniem `root:fitkrasnal 640`, restart;
+  wartości nie trafiają do zmiennych ani na terminal.
+- **Statystyki:** bez nowych zdarzeń — adopcję pokazuje istniejące
+  `login_google` na `/usage`, funkcjonowanie powłoki `native_app_open`.
+
 ## Utwardzenie publicznych interfejsów (25.5.0)
 
 - **`app/middleware.py`** (czyste ASGI, bez nowych frameworków), wpinane przez

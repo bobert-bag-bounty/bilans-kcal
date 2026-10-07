@@ -64,6 +64,35 @@ Po wysłaniu formularza (logowanie, rejestracja, wylogowanie → 303 → GET) st
 a `mobile.html`, `login.html` i `register.html` przeładowują się jednorazowo,
 gdy widzą ten marker bez `window.Capacitor` (od wersji 25.2.2 backendu).
 
+## Logowanie Google w WebView
+
+„Zaloguj przez Google" (OIDC w backendzie) ma się odbyć wewnątrz aplikacji,
+dlatego `capacitor.config.ts` dopisuje `accounts.google.com` do
+`server.allowNavigation`: bez tego Capacitor otwiera każdy obcy host
+w zewnętrznej przeglądarce (`Bridge.launchIntent` → `ACTION_VIEW`) i sesja
+po zalogowaniu zostaje w Chrome, nie w aplikacji. Koszt: strony z tego hosta
+dostają kanał `androidBridge` (`WebMessageListener` rejestrowany dla
+wszystkich `allowedOriginRules`), czyli skrypt na `accounts.google.com`
+mógłby wołać wtyczki natywne (aparat, Health Connect); `window.Capacitor`
+wstrzykiwany jest tylko do origin aplikacji. Dlatego tylko ten jeden host,
+nie `*.google.com` (`sites.`/`script.google.com` serwują treści użytkowników).
+
+Google ogłosiło blokadę OAuth w osadzonych WebView (wpis „Modernizing OAuth
+interactions in native apps", 2016; błąd `403 disallowed_useragent`,
+rozpoznanie po UA `; wv` / `Version/4.0`). Sprawdzenie na telefonie
+(klient typu „Web application", prawdziwy UA WebView, DevTools) doszło
+jednak do kroku z hasłem bez tego błędu, więc UA zostaje domyślny
+(`appendUserAgent: 'FitKrasnalApp/1'`). **Zweryfikowano tylko do kroku
+z hasłem**: callback na host aplikacji, ciasteczko sesji w WebView, 2FA /
+passkey i ekrany zgody, które mogą zejść z `accounts.google.com`, czekają na
+test z prawdziwym klientem — każdy zaobserwowany host dopisać do
+`allowNavigation` jawnie. Gdyby blokada UA wróciła, obejściem jest
+`android.overrideUserAgent` z UA mobilnego Chrome'a zakończonym markerem
+`FitKrasnalApp/1` (override zastępuje cały ciąg, marker musi być w środku).
+Właściwe rozwiązanie to Chrome Custom Tabs (`@capacitor/browser`) z deep
+linkiem / App Linkiem na `/auth/google/callback`, który wraca do aplikacji
+i dopiero tam ustawia sesję — wymaga zmian w backendzie, dlatego nie w PoC.
+
 ## Test na urządzeniu (bez logowania w GUI)
 
 W buildzie debug WebView jest debugowalny. Po `adb reverse tcp:8000 tcp:8000`

@@ -12,7 +12,10 @@ const config: CapacitorConfig = {
   webDir: 'www',
   server: {
     url: appUrl,
-    allowNavigation: [appHost],
+    // Logowanie Google (OIDC) ma się odbyć w WebView: bez tego wpisu Capacitor
+    // wyrzuca accounts.google.com do zewnętrznej przeglądarki (ACTION_VIEW)
+    // i sesja ląduje w Chrome, nie w aplikacji.
+    allowNavigation: [appHost, 'accounts.google.com'],
     androidScheme: 'https',
     cleartext: isHttp,
   },
