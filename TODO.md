@@ -18,15 +18,6 @@ Tylko dla forka: wyłączenie Actions, pełna suita przed pushem, tanie resztki
 szybki start przeniesienia projektu GCP i ściąga dla autora. Decyzje autora
 przy scaleniu do upstreamu (bump noty prywatności, utwardzenie) w sekcji F.
 
-## Synchronizacja z upstreamem (18 commitów od rozwidlenia) (4/10)
-
-→ [plans/upstream-sync.md](plans/upstream-sync.md). Scal (`git merge
-upstream/main`), nie rebase — 13 publicznych commitów forka. 4 pliki w konflikcie
-(9 hunków): `VERSION` (bump do 27.0.0), `meal_vision.py` (Vertex forka ×
-kaskada/timeouty upstreamu — najdroższy), `usage.py` (suma zdarzeń),
-`mobile.html` (most Android × nowy UX zdjęcia); plus `tests/test_meal_vision.py`
-do poprawki (upstream zwraca krotkę). Migracje scalają się addytywnie. ~4 h.
-
 ## Pochodne naprawy czerwonego CI z 2026-09-06
 
 Hotfix zrobiony (DONE.md „Testy: «dziś» ze strefy użytkownika…"); zostało:
