@@ -1,7 +1,7 @@
 # Architektura Fit Krasnal
 
 Mapa kodu pod czytanie — dla człowieka i dla asystenta LLM. Wszystkie
-twierdzenia pochodzą z kodu (stan: VERSION 25.6.0). Konwencje i reguły pracy są
+twierdzenia pochodzą z kodu (stan: VERSION 27.0.0). Konwencje i reguły pracy są
 w [CLAUDE.md](CLAUDE.md); tutaj jest **topologia**: co woła co i gdzie zapadają
 decyzje. Jedno źródło prawdy per temat — nie powtarzamy tu reguł z CLAUDE.md.
 
@@ -17,7 +17,7 @@ WebView ładujący tę samą zdalną stronę — nie osobny klient.
 ## Przepływ żądania
 
 `main.py` dodaje `SessionMiddleware`, potem `main.install_hardening` dokłada
-cztery middleware z `app/middleware.py` + `TrustedHost` (tę samą funkcję woła
+trzy middleware z `app/middleware.py` + `TrustedHost` (tę samą funkcję woła
 `tests/test_hardening.py`, bez sesji). `add_middleware` owija od zewnątrz
 (ostatni dodany działa pierwszy), więc kolejność na żądaniu jest:
 
@@ -47,7 +47,9 @@ Gdzie zapadają decyzje:
 Kolejka (`routers/meals.py`): brak klucza LLM → wpis do kolejki (oba
 endpointy). Przy wyjątku szacowania: `/api/meals/text` kolejkuje każdy;
 `/api/meals/photo` kolejkuje wszystko **poza `ValueError`** (nieobsługiwany
-format, nieprawidłowa odpowiedź modelu → 422, bez kolejki). Przetwarza ją poza
+format, nieczytelne zdjęcie → 422, bez kolejki); nieprawidłowa odpowiedź
+modelu (`RuntimeError`) trafia do kolejki z `last_error_kind` z
+`meal_vision.classify_error`. Przetwarza ją poza
 procesem WWW timer (patrz „Wdrożenie"). Retencja 21 dni, `purge_expired` też
 na starcie.
 
@@ -77,6 +79,7 @@ trends.py      dane trendów (M9) — payload (jedno źródło dla HTML i JSON)
 balance.py     dzienny bilans energetyczny (M5)
 energy.py      BMR (Mifflin), NEAT z kroków, MET aktywności, teoretyczne TDEE
 calibration.py kalibracja adaptacyjna (6.2) — model uczy się na danych usera
+activity_dedup.py trening zsynchronizowany + dopisany ręcznie liczony raz (upstream 25.2.2)
 forecast.py    prognoza osiągnięcia celu wagi (6.4) z regresji wygładzonej wagi
 macros.py      zapotrzebowanie makro wg norm WHO (6) i ocena pokrycia
 meal_vision.py szacowanie kcal/makro ze zdjęcia lub opisu (M4) — backendy LLM
@@ -125,7 +128,7 @@ env (np. z `setup-vm.sh`) **nadpisuje** domyślną, nie przywraca jej.
 | `FIT_KRASNAL_VERTEX_PROJECT` | `VERTEX_PROJECT` | projekt GCP dla Vertex AI | `services/meal_vision.py` |
 | `FIT_KRASNAL_VERTEX_LOCATION` | `VERTEX_LOCATION` | region Vertex (domyślnie `europe-west1`) | `services/meal_vision.py` |
 | `FIT_KRASNAL_VISION_MODEL` | `VISION_MODEL` | model Claude (domyślnie `claude-opus-5`) | `services/meal_vision.py` |
-| `FIT_KRASNAL_GEMINI_MODEL` | `GEMINI_MODEL` | model Gemini (domyślnie `gemini-3.5-flash`) | `services/meal_vision.py` |
+| `FIT_KRASNAL_GEMINI_MODELS` | `GEMINI_MODELS` | kaskada modeli Gemini (lista CSV, pierwszy to domyślny) | `services/meal_vision.py` |
 | (brak env) | `MAX_PHOTO_BYTES` | limit zdjęcia 8 MB | `main.py`, `routers/meals.py` |
 | (brak env) | `SESSION_MAX_AGE_S` | żywotność sesji 14 dni | `main.py` |
 | `FIT_KRASNAL_ALLOWED_HOSTS` | `ALLOWED_HOSTS` | akceptowane nagłówki Host (domyślnie `*`) | `main.py` |
@@ -146,9 +149,11 @@ env (np. z `setup-vm.sh`) **nadpisuje** domyślną, nie przywraca jej.
 `ADMIN_EMAIL` ma domyślną wartość `krasnal@krasnal.cc` wpisaną w kodzie — to
 konto admina upstreamu. Na forku ustaw `FIT_KRASNAL_ADMIN_EMAIL` na własny
 adres, inaczej `/usage` należy do konta upstreamu.
-`FIT_KRASNAL_VERTEX_LOCATION`: domyślny `gemini-3.5-flash` zwracał 404 w
-`europe-west1` (2026-10-08), pod `global` działa — fork ustawia `global`,
-patrz `deploy/README.md`.
+`FIT_KRASNAL_VERTEX_LOCATION`: modele z kaskady `GEMINI_MODELS` zwracały 404 w
+`europe-west1` (2026-10-08), pod `global` działają — fork ustawia `global`,
+patrz `deploy/README.md`. `meal_vision._estimate_gemini` próbuje modele z
+`GEMINI_MODELS` po kolei (upstream 26.2.2) aż któryś odpowie; backend `vertex`
+używa tej samej kaskady przez klienta ADC z `gemini_client`.
 
 ## Co czyta co: `usage.EVENTS` → gdzie emitowane
 
@@ -167,7 +172,8 @@ Serwer woła `usage_service.bump(...)`; klient woła `track(event)` →
 | `strava_sync_ok`, `strava_sync_error` | `services/sync.py` |
 | `transfer_export`, `transfer_import` | `routers/transfer.py` |
 | `trends_view`, `trends_7/30/90/180` | `routers/trends.py` (`trends_{nearest_range}`) |
-| `calibration_step`, `calibration_reset`, `calibration_error` | `services/calibration.py` |
+| `calibration_step`, `calibration_reset`, `calibration_error`, `calibration_skip_partial` | `services/calibration.py` |
+| `photo_resize_fail`, `photo_net_upload`, `photo_net_wait`, `photo_slow` | `mobile.html` — diagnostyka etapu szacowania zdjęcia (upstream 26.2.x) |
 | `photo_pick` | `mobile.html` — `onchange` na `<input type=file>` |
 | `tab_today/add/activities/trends/settings` | `mobile.html` — `track("tab_" + page)` |
 | `manual_open` | `mobile.html` (otwarcie wpisu ręcznego) |

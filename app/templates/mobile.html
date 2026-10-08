@@ -198,6 +198,30 @@
     </div>
     <p class="muted" id="w-status" style="margin:4px 0 0"></p>
   </section>
+  <section class="card" id="draft" style="display:none">
+    <h2 id="d-title">Szacunek — sprawdź i popraw</h2>
+    <input type="text" id="d-desc" placeholder="Opis posiłku"
+           style="font-size:15px;font-weight:600;margin-bottom:6px">
+    <div id="d-llm-details">
+      <div id="d-items" class="muted" style="margin-bottom:6px"></div>
+      <ul id="d-assumptions" class="muted"></ul>
+    </div>
+    <div class="row2">
+      <span style="flex:1"><label>kcal</label><input type="number" id="d-kcal"></span>
+      <span style="flex:1"><label>białko g</label><input type="number" step="0.1" id="d-protein"></span>
+    </div>
+    <div class="row2">
+      <span style="flex:1"><label>tłuszcz g</label><input type="number" step="0.1" id="d-fat"></span>
+      <span style="flex:1"><label>węgle g</label><input type="number" step="0.1" id="d-carbs"></span>
+    </div>
+    <div class="row2">
+      <span style="flex:1"><label>błonnik g</label><input type="number" step="0.1" id="d-fiber" value="0"></span>
+      <span style="flex:1"><label>cukry wolne g</label><input type="number" step="0.1" id="d-sugars" value="0"></span>
+    </div>
+    <p class="muted" id="d-range"></p>
+    <button class="ghost sm" id="save-to-my-meals-btn" onclick="saveToMyMeals()" style="margin-bottom:6px">Zapisz w moich posiłkach</button>
+    <button class="primary" onclick="saveDraft()">Zapisz posiłek</button>
+  </section>
   <section class="card">
     <h2>Dodaj posiłek</h2>
     <div class="row2">
@@ -233,34 +257,11 @@
     <button class="ghost" onclick="showManual()" style="margin-top:4px">Wpisz wartości ręcznie</button>
     <button class="ghost" onclick="toggleSavedMeals()" style="margin-top:4px">Moje posiłki ▼</button>
     <p class="muted" id="msg"></p>
+    <p class="muted" id="msg-step" style="margin:-6px 0 0"></p>
   </section>
   <section class="card" id="saved-meals-panel" style="display:none">
     <h2>Moje posiłki</h2>
     <div id="saved-meals-list"><p class="muted">Ładowanie…</p></div>
-  </section>
-  <section class="card" id="draft" style="display:none">
-    <h2 id="d-title">Szacunek — sprawdź i popraw</h2>
-    <input type="text" id="d-desc" placeholder="Opis posiłku"
-           style="font-size:15px;font-weight:600;margin-bottom:6px">
-    <div id="d-llm-details">
-      <div id="d-items" class="muted" style="margin-bottom:6px"></div>
-      <ul id="d-assumptions" class="muted"></ul>
-    </div>
-    <div class="row2">
-      <span style="flex:1"><label>kcal</label><input type="number" id="d-kcal"></span>
-      <span style="flex:1"><label>białko g</label><input type="number" step="0.1" id="d-protein"></span>
-    </div>
-    <div class="row2">
-      <span style="flex:1"><label>tłuszcz g</label><input type="number" step="0.1" id="d-fat"></span>
-      <span style="flex:1"><label>węgle g</label><input type="number" step="0.1" id="d-carbs"></span>
-    </div>
-    <div class="row2">
-      <span style="flex:1"><label>błonnik g</label><input type="number" step="0.1" id="d-fiber" value="0"></span>
-      <span style="flex:1"><label>cukry wolne g</label><input type="number" step="0.1" id="d-sugars" value="0"></span>
-    </div>
-    <p class="muted" id="d-range"></p>
-    <button class="ghost sm" id="save-to-my-meals-btn" onclick="saveToMyMeals()" style="margin-bottom:6px">Zapisz w moich posiłkach</button>
-    <button class="primary" onclick="saveDraft()">Zapisz posiłek</button>
   </section>
 </div>
 
@@ -510,17 +511,26 @@ if ("serviceWorker" in navigator) {
 function downscale(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 1280, s = Math.min(1, MAX / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      c.toBlob(blob => { URL.revokeObjectURL(img.src); resolve(blob); }, "image/jpeg", 0.82);
+      try {
+        const MAX = 1280, s = Math.min(1, MAX / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(blob => {
+          URL.revokeObjectURL(url);
+          // toBlob gives null when the canvas could not be allocated (iOS memory limits).
+          blob ? resolve(blob) : reject(new Error("toBlob returned null"));
+        }, "image/jpeg", 0.82);
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
     };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image decode failed")); };
+    img.src = url;
   });
 }
+const fmtSize = (n) => n >= 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " MB"
+                                    : Math.round(n / 1024) + " kB";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r0 = (v) => Math.round(v || 0);
@@ -671,6 +681,65 @@ async function apiJson(path, body, method = "POST") {
 }
 async function apiForm(path, formData) {
   return api(path, {method: "POST", body: formData});
+}
+/** Trzyma ekran włączony na czas długiego żądania (Wake Lock API; Chrome i Firefox
+ * ≥126 na Androidzie). Wygaszony ekran zamraża stronę i zrywa wysyłkę zdjęcia.
+ * Blokada sama znika, gdy karta traci pierwszy plan — zakładamy ją znowu po
+ * powrocie. Brak API / odmowa = po cichu działamy bez niej. Zwraca funkcję zwalniającą. */
+async function holdScreenAwake() {
+  if (!("wakeLock" in navigator)) return () => {};
+  let lock = null, released = false;
+  const acquire = async () => {
+    try { lock = await navigator.wakeLock.request("screen"); } catch (_) { lock = null; }
+  };
+  const onVisible = () => { if (!released && document.visibilityState === "visible") acquire(); };
+  document.addEventListener("visibilitychange", onVisible);
+  await acquire();
+  return () => {
+    released = true;
+    document.removeEventListener("visibilitychange", onVisible);
+    if (lock) lock.release().catch(() => {});
+  };
+}
+/** POST multipart przez XHR — jedyny sposób na postęp wysyłania. `onStage` dostaje
+ * "upload" (z `pct`) i "wait" (ciało wysłane, czekamy na serwer/model). Błąd sieci
+ * niesie `err.stage`, żeby było wiadomo, na którym etapie zerwało połączenie. */
+function apiFormStaged(path, formData, onStage) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let stage = "upload";
+    const fail = (message) => { const e = new Error(message); e.stage = stage; e.network = true; reject(e); };
+    xhr.open("POST", path);
+    xhr.withCredentials = true;
+    // Body fully sent -> waiting for the server. Several signals can say so (Firefox
+    // delivers `upload.onload` late or after the last progress event), so the
+    // switch is idempotent and does not depend on any single one of them.
+    const toWait = () => { if (stage === "upload") { stage = "wait"; onStage("wait", 100); } };
+    xhr.upload.onprogress = (ev) => {
+      if (stage !== "upload" || !ev.lengthComputable) return;
+      if (ev.loaded >= ev.total) toWait();
+      else onStage("upload", Math.round(100 * ev.loaded / ev.total));
+    };
+    xhr.upload.onload = toWait;
+    xhr.upload.onloadend = toWait;
+    xhr.onreadystatechange = () => { if (xhr.readyState >= 2) toWait(); };
+    xhr.onerror = () => fail("network error");
+    xhr.onabort = () => fail("aborted");
+    xhr.ontimeout = () => fail("timeout");
+    xhr.timeout = 150000;
+    xhr.onload = () => {
+      if (xhr.status === 401) { location.href = "/login"; reject(new Error("not logged in")); return; }
+      const t = xhr.responseText || "";
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const err = new Error(`HTTP ${xhr.status}: ${t.slice(0, 200)}`);
+        err.status = xhr.status;
+        try { err.detail = JSON.parse(t).detail; } catch (_) { err.detail = null; }
+        reject(err); return;
+      }
+      try { resolve(JSON.parse(t)); } catch (_) { resolve(t); }
+    };
+    xhr.send(formData);
+  });
 }
 
 function track(event) {
@@ -941,6 +1010,7 @@ async function renderTargetFormula() {
         + `Prognoza doby = zmierzone przez Garmina ${f.measured} + spoczynek do północy ${f.resting_left} `
         + `+ zwyczajny ruch do wieczora ${f.neat_left}`
         + (f.baseline_days ? ` (Twoja baza ${f.baseline_neat} kcal/d, mediana z ${f.baseline_days} dni)` : ` (baza domyślna ${f.baseline_neat} kcal/d — za mało historii)`)
+        + (f.baseline_activity ? ` + typowy trening, którego jeszcze nie było ${f.activity_left} (${Math.round(f.workout_share * 100)}% Twojej mediany ${f.baseline_activity} kcal/d — ostrożnie, na wypadek dnia bez treningu)` : "")
         + `. Każda zsynchronizowana aktywność podnosi prognozę od razu.`;
     } else {
       txt = `Cel dnia (dziś) = spalone ${rep.kcal_out} × kalibracja ${calStr} + bilans ${balSigned} = ${rep.target_kcal}.`;
@@ -1030,14 +1100,30 @@ function renderMeals(meals, pending) {
           <button class="x" onclick="delMeal(${m.id})">✕</button>
         </div>`).join("")
     : '<p class="muted">Brak posiłków dziś.</p>';
-  document.getElementById("t-pending").innerHTML = (pending && pending.length) ? `
-    <p class="muted" style="margin:10px 0 4px;font-weight:600">W kolejce (czeka na LLM)</p>` +
+  document.getElementById("t-pending").innerHTML = (pending && pending.length) ?
+    queueWarningBanner(pending) +
+    `<p class="muted" style="margin:10px 0 4px;font-weight:600">W kolejce (czeka na LLM)</p>` +
     pending.map(p => `
       <div class="entry">
-        <div style="flex:1"><div class="muted">${esc(p.label)}${p.has_photo ? " 📷" : ""}</div></div>
+        <div style="flex:1"><div class="muted">${esc(p.label)}${p.has_photo ? " 📷" : ""}${
+          p.next_attempt_in ? ` · kolejna próba ${p.next_attempt_in}` : ""}</div></div>
         <button class="ghost" style="flex:none;padding:6px 10px;margin:0;width:auto" onclick="playPending(${p.id})">▶</button>
         <button class="x" onclick="delPending(${p.id})">✕</button>
       </div>`).join("") : "";
+}
+
+// Ostrzeżenie nad kolejką, gdy powodem zalegania jest klucz LLM (nie limit/przeciążenie
+// — to się sam naprawi, klucza nikt za użytkownika nie poprawi). Jeden komunikat na
+// najgorszy z obecnych powodów, nie po jednym na wpis — to samo dla całej kolejki.
+function queueWarningBanner(pending) {
+  const kind = pending.some(p => p.error_kind === "invalid_key") ? "invalid_key"
+    : pending.some(p => p.error_kind === "no_key") ? "no_key" : null;
+  if (!kind) return "";
+  const msg = kind === "invalid_key"
+    ? "⚠️ Klucz LLM w Ustawieniach jest nieprawidłowy — posiłki nie zostaną przetworzone, dopóki go nie poprawisz."
+    : "⚠️ Brak klucza LLM w Ustawieniach — posiłki będą czekać w kolejce, dopóki go nie dodasz.";
+  return `<p style="background:rgba(220,53,69,.1);border:1px solid var(--danger);padding:8px 10px;` +
+    `border-radius:8px;color:var(--danger);font-size:12px;margin:10px 0">${msg}</p>`;
 }
 
 async function doSync() {
@@ -1109,25 +1195,51 @@ async function saveWeighIn() {
 async function estimate() {
   refreshMealWhen();
   const msg = document.getElementById("msg");
+  const step = document.getElementById("msg-step");
   const file = document.getElementById("f-photo").files[0] || _nativePhoto;
   const desc = document.getElementById("f-desc").value.trim();
   if (!file && !desc) { msg.textContent = "Dodaj zdjęcie albo opis."; return; }
   krasnalSays(msg, KRASNAL_STATUS.estimating);
+  step.textContent = "";
+  const releaseScreen = await holdScreenAwake();
+  let waitTimer = null, waitStarted = 0;
+  const onStage = (stage, pct) => {
+    if (stage === "upload") {
+      if (!waitTimer) step.textContent = `Wysyłam zdjęcie… ${pct}%`;
+    } else if (!waitTimer) {
+      waitStarted = Date.now();
+      const tick = () => {
+        const s = Math.round((Date.now() - waitStarted) / 1000);
+        step.textContent = `Czekam na model… ${s} s`;
+      };
+      tick();
+      waitTimer = setInterval(tick, 1000);
+    }
+  };
   try {
     let est;
     if (file) {
       const fd = new FormData();
-      let blob;
+      let blob = file;
       if (file === _nativePhoto) {
-        blob = file;   // Camera.getPhoto już zmniejszyło do 1280 px / jpeg 80
+        // Camera.getPhoto już zmniejszyło do 1280 px / jpeg 80 — nie zmniejszamy drugi raz
       } else {
-        try { blob = await downscale(file); } catch(e) { blob = file; }
+        step.textContent = "Zmniejszam zdjęcie…";
+        try {
+          const small = await downscale(file);
+          if (small.size < file.size) blob = small;
+          step.textContent = `Zmniejszam zdjęcie… ${fmtSize(file.size)} → ${fmtSize(blob.size)}`;
+        } catch (e) {
+          track("photo_resize_fail");
+          step.textContent = `Nie udało się zmniejszyć zdjęcia — wysyłam oryginał (${fmtSize(file.size)})`;
+        }
       }
       fd.append("photo", blob, "photo.jpg");
       if (document.getElementById("f-note").value.trim()) fd.append("note", document.getElementById("f-note").value.trim());
       const day = document.getElementById("f-date").value;
       if (day) fd.append("day", day);
-      est = await apiForm("/api/meals/photo", fd);
+      est = await apiFormStaged("/api/meals/photo", fd, onStage);
+      if (waitStarted && Date.now() - waitStarted > 30000) track("photo_slow");
     } else {
       const fd = new FormData();
       fd.append("description", desc);
@@ -1140,7 +1252,18 @@ async function estimate() {
     resetAddForm();
     msg.textContent = "";
   } catch (e) {
-    msg.textContent = "Nie udało się oszacować: " + e.message;
+    if (e.network) {
+      track(e.stage === "upload" ? "photo_net_upload" : "photo_net_wait");
+      msg.textContent = e.stage === "upload"
+        ? "Nie udało się wysłać zdjęcia — połączenie zerwane podczas wysyłania. Spróbuj ponownie."
+        : "Połączenie zerwane podczas czekania na model. Zdjęcie mogło dojść — sprawdź kolejkę przed ponowną próbą.";
+    } else {
+      msg.textContent = "Nie udało się oszacować: " + e.message;
+    }
+  } finally {
+    releaseScreen();
+    if (waitTimer) clearInterval(waitTimer);
+    step.textContent = "";
   }
 }
 
@@ -1174,7 +1297,7 @@ function showDraft(e) {
   document.getElementById("d-fiber").value = sum("fiber_g").toFixed(1);
   document.getElementById("d-sugars").value = sum("sugars_g").toFixed(1);
   document.getElementById("d-range").textContent =
-    `Przedział: ${r0(e.kcal_min)}–${r0(e.kcal_max)} kcal`;
+    `Przedział: ${r0(e.kcal_min)}–${r0(e.kcal_max)} kcal` + (e.model ? ` · ${e.model}` : "");
 }
 
 function showManual() {
@@ -1674,10 +1797,14 @@ async function loadActivityList(day) {
         const dist = a.distance_m ? ` · ${(a.distance_m/1000).toFixed(1)} km` : "";
         const steps = a.est_steps ? ` (~${a.est_steps} kroków)` : "";
         const mins = Math.round(a.duration_s / 60);
-        html += `<div class="entry">
+        // Same workout already synced from the source: kept, but not counted.
+        const kcal = a.duplicate
+          ? `<s>${a.kcal_garmin} kcal</s> · nie liczymy — ten sam trening przyszedł już ${SRC().fromGen}`
+          : `${a.kcal_garmin} kcal`;
+        html += `<div class="entry"${a.duplicate ? ' style="opacity:.6"' : ""}>
           <div style="flex:1">
             <div><b>${TYPE_LABELS[a.type] || esc(a.type)}</b> ${mins} min${dist}${steps}</div>
-            <div class="muted">${a.kcal_garmin} kcal</div>
+            <div class="muted">${kcal}</div>
           </div>
           <button class="x" onclick="deleteActivity(${a.id}, renderToday)">✕</button>
         </div>`;

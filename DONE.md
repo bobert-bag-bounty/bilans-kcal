@@ -14,6 +14,20 @@ początek odpowiedniego pliku w `archive/` (najnowsze u góry). Format wpisu
 w archiwum: tytuł + **maksymalnie 5 punktów**; szczegóły implementacji zostają
 w komunikacie commita, nie tutaj.
 
+## Scalenie z upstreamem — [archive/done-v27-upstream-merge.md](archive/done-v27-upstream-merge.md)
+
+- Scalenie z upstreamem (18 commitów, 27.0.0)
+
+## Kcal accuracy audit 2026-10 — [archive/done-kcal-audit-2026-10.md](archive/done-kcal-audit-2026-10.md)
+
+- Forecast expects 75% of the usual workout — explicit conservative shift (26.1.0)
+- Calibration skips partially logged days (26.0.2)
+- Stored forecast keeps the hour it was made for (26.0.1)
+- Day forecast expects the user's usual workout (26.0.0)
+- Strava workouts no longer zeroed by inflated duration (25.2.3)
+- Manual workout that was also synced counts once (25.2.2)
+- Calibration no longer crashes for users without a Garmin daily total (25.2.1)
+
 ## v24–v25 — [archive/done-v24-v25.md](archive/done-v24-v25.md)
 
 - Infrastruktura forka na GCP: Terraform (SA bez kluczy, SSH tylko IAP, bucket APK, sekret OAuth), allowlista z metadanych VM, Vertex pod endpointem `global`; nota prywatności o regionie wg operatora; porządki po audycie przed publikacją (25.6.1)

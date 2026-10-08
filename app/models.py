@@ -94,6 +94,11 @@ class DailySummary(Base):
     # wejściu na dzień; po domknięciu doby porównywana z kcal_total_garmin na
     # /usage. Bez backfillu.
     forecast_total_kcal: Mapped[int | None] = mapped_column(Integer)
+    # Local hour (with fraction) the stored forecast was computed for - the
+    # time of the Garmin sync it extends. A forecast at 22:00 is nearly the
+    # measurement itself, one at 07:00 is a real prediction; without the hour
+    # /usage mixed both. NULL for rows from before 26.0.1 (not recoverable).
+    forecast_hour_local: Mapped[float | None] = mapped_column(Float)
 
 
 class Activity(Base):
@@ -142,6 +147,14 @@ class PendingMeal(Base):
     note: Mapped[str | None] = mapped_column(String)        # uwaga do zdjęcia
     photo_path: Mapped[str | None] = mapped_column(String)  # wariant zdjęciowy (zredukowany JPEG)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    # Backoff: kiedy wolno spróbować znowu (timer kolejki chodzi co minutę, ale
+    # bez tego odpytywałby ten sam, wciąż zawodzący wpis w każdym przebiegu —
+    # przy skromnych darmowych limitach Gemini (RPM/RPD) to samo dobija budżet).
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Kategoria ostatniego błędu ("no_key" | "invalid_key" | "rate_limited" |
+    # "error") — do wyświetlenia ostrzeżenia nad kolejką (patrz meal_vision
+    # .classify_error). None, gdy wpis jeszcze nie był próbowany.
+    last_error_kind: Mapped[str | None] = mapped_column(String)
 
 
 class SavedMeal(Base):

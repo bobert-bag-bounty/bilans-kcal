@@ -48,10 +48,18 @@ EVENTS: set[str] = {
     "day_view",
     "tab_today", "tab_add", "tab_activities", "tab_trends", "tab_settings",
     "manual_open", "saved_meals_open", "photo_pick",
-    "calibration_step", "calibration_reset", "calibration_error",
+    "calibration_step", "calibration_reset", "calibration_error", "calibration_skip_partial",
     # powłoka Android (Capacitor) — adopcja i użycie mostka natywnego
     "native_app_open", "photo_native_camera", "photo_native_gallery", "steps_health_connect",
+    # Photo estimate diagnostics (client-side stage where the request failed).
+    "photo_resize_fail", "photo_net_upload", "photo_net_wait", "photo_slow",
 }
+
+# Forecast snapshots taken before this local hour count as "morning".
+MORNING_SNAPSHOT_END_H = 12
+
+# Reference resting expenditure for stats that have no user profile at hand.
+REFERENCE_BMR_KCAL = 1700
 
 MEAL_SAVE_EVENTS = {"meal_save_photo", "meal_save_text", "meal_save_manual", "meal_save_saved"}
 
@@ -311,6 +319,46 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         .where(Activity.user_id.in_(allowed_ids), Activity.source == "garmin",
                Activity.date >= since)
     ).all()
+
+    # Manual entries that duplicate a synced workout (excluded from kcal).
+    from .activity_dedup import manual_duplicates, without_manual_duplicates
+
+    acts_by_user_day: dict[tuple[int, date], list[Activity]] = {}
+    for a in db.scalars(
+        select(Activity).where(Activity.user_id.in_(allowed_ids), Activity.date >= since)
+    ).all():
+        acts_by_user_day.setdefault((a.user_id, a.date), []).append(a)
+    n_manual = sum(1 for acts in acts_by_user_day.values() for a in acts if a.source == "manual")
+    dup_keys = [k for k, acts in acts_by_user_day.items() for _ in manual_duplicates(acts)]
+    manual_dedup = {
+        "manual_30d": n_manual,
+        "duplicates_30d": len(dup_keys),
+        "users": len({uid for uid, _ in dup_keys}),
+    }
+
+    # Synced workouts whose estimated resting part hit the cap in
+    # day._activity_resting_kcal (inflated duration). Without a profile here
+    # the day's Garmin BMR is used, else a reference adult BMR - approximate.
+    from .day import MAX_RESTING_SHARE
+
+    bmr_by_day = dict(
+        ((uid, d), bmr) for uid, d, bmr in db.execute(
+            select(DailySummary.user_id, DailySummary.date, DailySummary.kcal_bmr_garmin)
+            .where(DailySummary.user_id.in_(allowed_ids), DailySummary.date >= since)
+        ).all()
+    )
+    synced_estimated = [
+        a for acts in acts_by_user_day.values() for a in acts
+        if a.source != "manual" and a.kcal_bmr_garmin is None and a.kcal_garmin
+    ]
+    resting_capped = {
+        "synced_estimated_30d": len(synced_estimated),
+        "capped_30d": sum(
+            1 for a in synced_estimated
+            if (bmr_by_day.get((a.user_id, a.date)) or REFERENCE_BMR_KCAL) / 86400 * a.duration_s
+            > MAX_RESTING_SHARE * a.kcal_garmin
+        ),
+    }
     n_activities = len(activities)
     pct_with_bmr = (
         round(100 * sum(1 for kb, _ in activities if kb is not None) / n_activities, 1)
@@ -340,6 +388,12 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
                 round(100 * sum(1 for r in ratios if abs(r - 1) > 0.15) / len(ratios), 1)
                 if ratios else None
             ),
+            # Share of days above 1.0 - for the forecast: days whose morning
+            # target was too high (the side FORECAST_WORKOUT_SHARE guards).
+            "above_1_pct": (
+                round(100 * sum(1 for r in ratios if r > 1) / len(ratios), 1)
+                if ratios else None
+            ),
         }
 
     model_ratio = _ratio_stats(
@@ -350,6 +404,41 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
     forecast_ratio = _ratio_stats(
         [f / g for _, _, g, _, complete, f in rows
          if complete and g is not None and g > 0 and f is not None]
+    )
+    # Same, split by whether the day had a workout: the forecast expects the
+    # usual workout (energy.full_day_forecast), so training days should move
+    # towards 1.0 and rest days should not drift far above it.
+    def _trained(uid: int, d: date) -> bool:
+        return bool(without_manual_duplicates(acts_by_user_day.get((uid, d), [])))
+
+    forecast_ratio_training = _ratio_stats(
+        [f / g for uid, d, g, _, complete, f in rows
+         if complete and g is not None and g > 0 and f is not None and _trained(uid, d)]
+    )
+    # Only forecasts taken in the morning: a real prediction, not a
+    # near-final number from an evening visit (DailySummary.forecast_hour_local).
+    hour_by_day = {
+        (uid, d): h for uid, d, h in db.execute(
+            select(DailySummary.user_id, DailySummary.date, DailySummary.forecast_hour_local)
+            .where(DailySummary.user_id.in_(allowed_ids), DailySummary.date >= since,
+                   DailySummary.forecast_hour_local.is_not(None))
+        ).all()
+    }
+    forecast_ratio_morning = _ratio_stats(
+        [f / g for uid, d, g, _, complete, f in rows
+         if complete and g is not None and g > 0 and f is not None
+         and hour_by_day.get((uid, d), 24.0) < MORNING_SNAPSHOT_END_H]
+    )
+    hours = sorted(hour_by_day.values())
+    forecast_hours = {
+        "known": len(hours),
+        "median": round(_percentile(hours, 50), 1) if hours else None,
+        "p10": round(_percentile(hours, 10), 1) if hours else None,
+        "p90": round(_percentile(hours, 90), 1) if hours else None,
+    }
+    forecast_ratio_rest = _ratio_stats(
+        [f / g for uid, d, g, _, complete, f in rows
+         if complete and g is not None and g > 0 and f is not None and not _trained(uid, d)]
     )
 
     meal_days = set(
@@ -374,6 +463,12 @@ def _stats_model_vs_measurement(db: Session, allowed_ids: set[int], today: date)
         "pct_with_steps": pct_with_steps, "model_ratio": model_ratio,
         "source_share": source_share,
         "forecast_ratio": forecast_ratio,
+        "forecast_ratio_morning": forecast_ratio_morning,
+        "forecast_hours": forecast_hours,
+        "forecast_ratio_training": forecast_ratio_training,
+        "forecast_ratio_rest": forecast_ratio_rest,
+        "manual_dedup": manual_dedup,
+        "resting_capped": resting_capped,
     }
 
 
@@ -454,6 +549,8 @@ def _stats_calibration(db: Session, allowed_ids: set[int], allowed_refs: set[str
         "reset_30": _event_sum(db, allowed_refs, "calibration_reset", today - timedelta(days=29), today),
         "error_7": _event_sum(db, allowed_refs, "calibration_error", today - timedelta(days=6), today),
         "error_30": _event_sum(db, allowed_refs, "calibration_error", today - timedelta(days=29), today),
+        "skip_partial_30": _event_sum(db, allowed_refs, "calibration_skip_partial",
+                                      today - timedelta(days=29), today),
     }
 
 
@@ -619,6 +716,7 @@ def _my_days(db: Session, admin_id: int, limit: int = 14) -> list[dict]:
             "kcal_bmr_garmin": s.kcal_bmr_garmin,
             "model_total_kcal": s.model_total_kcal,
             "forecast_total_kcal": s.forecast_total_kcal,
+            "forecast_hour_local": s.forecast_hour_local,
             "activities": acts_by_day.get(s.date, {}).get("count", 0),
             "activities_with_bmr": acts_by_day.get(s.date, {}).get("with_bmr", 0),
         }

@@ -87,25 +87,36 @@ class DayForecast:
     hours_left: float
     baseline_neat: float   # bazowy NEAT użytkownika (mediana z domkniętych dni)
     bmr_full: float        # spoczynek za pełną dobę użyty do prognozy
+    activity_left: float = 0.0      # usual workout still expected today
+    baseline_activity: float = 0.0  # usual workout kcal/day (median of closed days)
 
     @property
     def total(self) -> float:
-        return self.measured + self.resting_left + self.neat_left
+        return self.measured + self.resting_left + self.neat_left + self.activity_left
 
 
 def full_day_forecast(measured: float, bmr_full: float, baseline_neat: float,
-                      hour_local: float) -> DayForecast:
+                      hour_local: float, baseline_activity: float = 0.0,
+                      activity_done: float = 0.0) -> DayForecast:
     """`hour_local` — godzina (z ułamkiem) ostatniej synchronizacji w strefie
     użytkownika; pomiar jest aktualny na ten moment, nie na „teraz".
-    Monotoniczna względem czasu: o północy prognoza == pomiar."""
+    Monotoniczna względem czasu: o północy prognoza == pomiar.
+
+    Workouts: the part of the user's usual daily workout (`baseline_activity`)
+    not done yet (`activity_done`, already inside `measured`) is expected to
+    happen during the rest of the waking window. Without it the morning target
+    missed every training day by the whole workout (2026-10-04 audit: median
+    forecast/actual 0.65 for a tester who trains most days)."""
     hours_left = min(max(24.0 - hour_local, 0.0), 24.0)
     resting_left = bmr_full / 24.0 * hours_left
     waking = WAKING_END_H - WAKING_START_H
     frac_left = min(max((WAKING_END_H - hour_local) / waking, 0.0), 1.0)
     neat_left = baseline_neat * frac_left
+    activity_left = max(baseline_activity - activity_done, 0.0) * frac_left
     return DayForecast(
         measured=measured, resting_left=resting_left, neat_left=neat_left,
         hours_left=hours_left, baseline_neat=baseline_neat, bmr_full=bmr_full,
+        activity_left=activity_left, baseline_activity=baseline_activity,
     )
 
 

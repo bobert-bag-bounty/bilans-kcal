@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from ..models import Activity, DailySummary, Meal, PendingMeal, UserProfile, WeightLog
 from ..providers import garmin as garmin_provider
 from . import calibration, quips
+from .activity_dedup import manual_duplicates, without_manual_duplicates
 from .clock import user_now, user_today, user_tz
 from .balance import day_balance, deficit_warning, projected_weekly_change_kg
 from .energy import (
@@ -41,7 +42,7 @@ from .energy import (
 BASELINE_NEAT_DAYS = 7
 BASELINE_NEAT_MIN_DAYS = 3
 from .macros import coverage, who_targets
-from .timeago import humanize_ago
+from .timeago import humanize_ago, humanize_in
 
 # Przybliżenie kroków w biegu/marszu — ta sama stała, z której korzysta
 # `tdee_theoretical` (patrz punkt „Tabela MET jako dane" w DONE.md).
@@ -64,16 +65,29 @@ def _est_steps(activity: Activity) -> int:
     return 0
 
 
+# A logged workout burns at least ~2 MET, so its resting part is at most half
+# of the gross kcal. An estimate above that means the duration is inflated
+# (Strava elapsed_time with pauses, a forgotten stop) - without the cap the
+# subtraction wiped such workouts out entirely (2026-10-04 audit: 3 of 12
+# Strava activities counted as 0 kcal).
+MAX_RESTING_SHARE = 0.5
+
+
 def _activity_resting_kcal(activity: Activity, summary: DailySummary | None, bmr: float) -> float:
     """Spoczynek zegarka za czas trwania aktywności — do odjęcia od `kcal_garmin`
     (brutto) i uzyskania kcal netto. Kolejność fallbacków wg DONE.md („Poprawa
     wyliczania kcal na dzień w toku", krok 0): per-aktywność → proporcja z
-    dobowego spoczynku Garmina → model Mifflin."""
+    dobowego spoczynku Garmina → model Mifflin. Estimates (not the watch's own
+    per-activity value) are capped at MAX_RESTING_SHARE of the gross kcal."""
     if activity.kcal_bmr_garmin is not None:
         return activity.kcal_bmr_garmin
     if summary and summary.kcal_bmr_garmin is not None:
-        return summary.kcal_bmr_garmin / 86400 * activity.duration_s
-    return bmr / 86400 * activity.duration_s
+        resting = summary.kcal_bmr_garmin / 86400 * activity.duration_s
+    else:
+        resting = bmr / 86400 * activity.duration_s
+    if activity.kcal_garmin:
+        resting = min(resting, MAX_RESTING_SHARE * activity.kcal_garmin)
+    return resting
 
 
 def _garmin_activities_net_kcal(activities: list[Activity], summary: DailySummary | None,
@@ -88,9 +102,12 @@ def _garmin_activities_net_kcal(activities: list[Activity], summary: DailySummar
 
 
 def _history_baselines(db: Session, user_id: int, day: date, weight_kg: float,
-                       bmr: float) -> tuple[float, int, float | None]:
+                       bmr: float) -> tuple[float, int, float | None, float]:
     """Zwyczajny ruch i spoczynek użytkownika na podstawie historii.
-    Zwraca (neat_kcal, liczba użytych dni, bmr_garmin_full)."""
+    Zwraca (neat_kcal, liczba użytych dni, bmr_garmin_full, activity_kcal).
+    `activity_kcal` is the median net workout kcal per day (synced + manual,
+    duplicates dropped); median, so someone training less than every other
+    day gets 0 and rest days are not inflated."""
     summaries = db.scalars(
         select(DailySummary).where(
             DailySummary.user_id == user_id, DailySummary.date < day,
@@ -101,7 +118,7 @@ def _history_baselines(db: Session, user_id: int, day: date, weight_kg: float,
     bmr_garmin_full = float(statistics.median(bmr_vals)) if len(bmr_vals) >= BASELINE_NEAT_MIN_DAYS else None
 
     if len(summaries) < BASELINE_NEAT_MIN_DAYS:
-        return neat_from_steps(DEFAULT_STEPS, weight_kg), 0, bmr_garmin_full
+        return neat_from_steps(DEFAULT_STEPS, weight_kg), 0, bmr_garmin_full, 0.0
     dates = [s.date for s in summaries]
     acts_by_day: dict[date, list[Activity]] = {}
     for a in db.scalars(
@@ -112,7 +129,13 @@ def _history_baselines(db: Session, user_id: int, day: date, weight_kg: float,
         max(s.kcal_active_garmin - _garmin_activities_net_kcal(acts_by_day.get(s.date, []), s, bmr), 0)
         for s in summaries
     ]
-    return float(statistics.median(values)), len(values), bmr_garmin_full
+    workouts = []
+    for s in summaries:
+        acts = without_manual_duplicates(acts_by_day.get(s.date, []))
+        manual = sum(a.kcal_garmin or 0 for a in acts if a.source == "manual")
+        workouts.append(_garmin_activities_net_kcal(acts, s, bmr) + manual)
+    return (float(statistics.median(values)), len(values), bmr_garmin_full,
+            float(statistics.median(workouts)))
 
 
 def _sync_hour_local(summary: DailySummary | None, profile: UserProfile) -> float:
@@ -126,6 +149,16 @@ def _sync_hour_local(summary: DailySummary | None, profile: UserProfile) -> floa
     else:
         local = user_now(profile)
     return local.hour + local.minute / 60.0
+
+
+# Second deliberate conservative shift (owner decision 2026-10-04, CLAUDE.md
+# "Direction of error in the balance"): the day forecast expects only this
+# share of the user's median workout. The risk is rest days: with the full
+# median the morning target was too high on ~37% of days (backtest on
+# production data at 08:00); 0.75 cuts that to ~29% at the cost of a median
+# forecast/actual of 0.93 instead of 0.965. For a daily trainer this is
+# ~250 kcal - above the 100-150 kcal of the other shifts, accepted explicitly.
+FORECAST_WORKOUT_SHARE = 0.75
 
 
 def _floor_to_50(value: float) -> int:
@@ -174,6 +207,8 @@ def day_energy(
     „dziś" w momencie synchronizacji) — parametr zostaje w sygnaturze pod
     punkt „Strefa czasowa użytkownika jako granica dnia" z DONE.md."""
     kcal_in = sum(m.kcal for m in meals)
+    # A hand-logged workout that the watch/Strava also synced counts once.
+    activities = without_manual_duplicates(activities)
 
     steps = summary.steps if summary and summary.steps else DEFAULT_STEPS
     age = age_from_year(profile.birth_year, day)
@@ -267,6 +302,7 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
     )
 
     e = day_energy(profile, weight, day, summary, activities, meals, user_today(profile))
+    duplicate_ids = {a.id for a in manual_duplicates(activities)}
 
     if e.out_source in ("garmin", "mixed"):
         if summary and summary.kcal_bmr_garmin is not None:
@@ -307,14 +343,18 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
     baseline_days = 0
     bmr_source = "mifflin"
     if e.out_source == "mixed" and summary is not None:
-        baseline_neat, baseline_days, bmr_garmin_full = _history_baselines(db, user_id, day, weight, e.tdee.bmr)
+        baseline_neat, baseline_days, bmr_garmin_full, baseline_activity = _history_baselines(
+            db, user_id, day, weight, e.tdee.bmr)
         # Spoczynek z historii Garmina, bo prognoza ma trafić w liczbę Garmina.
         bmr_full = bmr_garmin_full if bmr_garmin_full is not None else e.tdee.bmr
         bmr_source = "garmin" if bmr_garmin_full is not None else "mifflin"
-        forecast = full_day_forecast(e.kcal_out, bmr_full, baseline_neat,
-                                     _sync_hour_local(summary, profile))
+        sync_hour = _sync_hour_local(summary, profile)
+        forecast = full_day_forecast(e.kcal_out, bmr_full, baseline_neat, sync_hour,
+                                     baseline_activity=FORECAST_WORKOUT_SHARE * baseline_activity,
+                                     activity_done=e.activities_net_kcal + e.manual_kcal)
         if summary.forecast_total_kcal is None:
             summary.forecast_total_kcal = round(forecast.total)
+            summary.forecast_hour_local = round(sync_hour, 1)
             db.commit()
     # Zaokrąglone TUTAJ, nie dopiero w odpowiedzi: cel dnia ma się liczyć z tej
     # samej liczby, którą API zwraca jako `forecast_kcal` — inaczej równanie
@@ -363,6 +403,9 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
                 "baseline_days": baseline_days,
                 "bmr_full": round(forecast.bmr_full),
                 "bmr_source": bmr_source,
+                "activity_left": round(forecast.activity_left),
+                "baseline_activity": round(baseline_activity),   # median, unscaled
+                "workout_share": FORECAST_WORKOUT_SHARE,
             }
             if forecast is not None else None
         ),
@@ -401,6 +444,8 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
                 "time": p.time.isoformat() if p.time else None,
                 "label": p.description or (p.note or "zdjęcie"),
                 "has_photo": bool(p.photo_path),
+                "error_kind": p.last_error_kind,
+                "next_attempt_in": humanize_in(p.next_attempt_at),
             }
             for p in pending
         ],
@@ -421,6 +466,7 @@ def day_report(db: Session, user_id: int, day: date) -> dict:
             {
                 "id": a.id, "type": a.type, "duration_s": a.duration_s, "distance_m": a.distance_m,
                 "kcal_garmin": a.kcal_garmin, "source": a.source,
+                "duplicate": a.id in duplicate_ids,
                 **({"est_steps": _est_steps(a)} if a.source == "manual" and _est_steps(a) else {}),
             }
             for a in activities

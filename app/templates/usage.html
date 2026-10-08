@@ -74,7 +74,7 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
         <td>{{ d.kcal_active_garmin if d.kcal_active_garmin is not none else "—" }}</td>
         <td>{{ d.kcal_bmr_garmin if d.kcal_bmr_garmin is not none else "—" }}</td>
         <td>{{ d.model_total_kcal if d.model_total_kcal is not none else "—" }}</td>
-        <td>{{ d.forecast_total_kcal if d.forecast_total_kcal is not none else "—" }}</td>
+        <td>{{ d.forecast_total_kcal if d.forecast_total_kcal is not none else "—" }}{% if d.forecast_hour_local is not none %} <span class="muted">@{{ d.forecast_hour_local }}</span>{% endif %}</td>
         <td>{{ d.activities }}</td><td>{{ d.activities_with_bmr }}</td></tr>
       {% else %}
       <tr><td colspan="8" class="muted">Brak danych.</td></tr>
@@ -117,6 +117,12 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     <div class="kpi"><b>{{ model_vs_measurement.pct_with_bmr if model_vs_measurement.pct_with_bmr is not none else "—" }}%</b><span class="muted">z BMR aktywności</span></div>
     <div class="kpi"><b>{{ model_vs_measurement.pct_with_steps if model_vs_measurement.pct_with_steps is not none else "—" }}%</b><span class="muted">z krokami</span></div>
   </div>
+  <p class="muted" style="margin-top:10px">Ręczne wpisy zdublowane z synchronizacją (30 dni, nie liczone do wydatku):
+    <b>{{ model_vs_measurement.manual_dedup.duplicates_30d }}</b> z {{ model_vs_measurement.manual_dedup.manual_30d }} ręcznych,
+    u {{ model_vs_measurement.manual_dedup.users }} os.</p>
+  <p class="muted">Aktywności z obciętym spoczynkiem (zawyżony czas trwania, 30 dni):
+    <b>{{ model_vs_measurement.resting_capped.capped_30d }}</b> z {{ model_vs_measurement.resting_capped.synced_estimated_30d }}
+    zsynchronizowanych bez spoczynku z zegarka.</p>
   <p class="muted" style="margin-top:10px">Rozjazd model / pomiar (model_total_kcal ÷ kcal_total_garmin,
     {{ model_vs_measurement.model_ratio.n }} dni domkniętych z obiema wartościami):
     mediana <b>{{ model_vs_measurement.model_ratio.median if model_vs_measurement.model_ratio.median is not none else "—" }}</b>,
@@ -130,6 +136,20 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     p90 <b>{{ model_vs_measurement.forecast_ratio.p90 if model_vs_measurement.forecast_ratio.p90 is not none else "—" }}</b>,
     poza ±15%: <b>{{ model_vs_measurement.forecast_ratio.outside_15pct if model_vs_measurement.forecast_ratio.outside_15pct is not none else "—" }}%</b>
     — czy cel dnia pokazywany rano trafia w to, co doba naprawdę przyniosła.</p>
+  {% set fh = model_vs_measurement.forecast_hours %}
+  <p class="muted">Godzina zapisanej prognozy ({{ fh.known }} dni z zapisaną godziną):
+    mediana <b>{{ fh.median if fh.median is not none else "—" }}</b>,
+    p10 {{ fh.p10 if fh.p10 is not none else "—" }}, p90 {{ fh.p90 if fh.p90 is not none else "—" }}.</p>
+  {% for label, r in [("z porannym zapisem (przed 12:00)", model_vs_measurement.forecast_ratio_morning),
+                      ("z treningiem", model_vs_measurement.forecast_ratio_training),
+                      ("bez treningu", model_vs_measurement.forecast_ratio_rest)] %}
+  <p class="muted">Prognoza / pomiar, dni {{ label }} ({{ r.n }}):
+    mediana <b>{{ r.median if r.median is not none else "—" }}</b>,
+    p10 <b>{{ r.p10 if r.p10 is not none else "—" }}</b>,
+    p90 <b>{{ r.p90 if r.p90 is not none else "—" }}</b>,
+    poza ±15%: <b>{{ r.outside_15pct if r.outside_15pct is not none else "—" }}%</b>,
+    prognoza za wysoka: <b>{{ r.above_1_pct if r.above_1_pct is not none else "—" }}%</b></p>
+  {% endfor %}
   <p class="muted">Domkniętych dni z posiłkiem: {{ model_vs_measurement.source_share.closed_with_meal }},
     z nich bez danych Garmina (bilans z modelu):
     <b>{{ model_vs_measurement.source_share.without_garmin_pct if model_vs_measurement.source_share.without_garmin_pct is not none else "—" }}%</b>.</p>
@@ -153,7 +173,8 @@ bez e-maili, treści posiłków, zdjęć, wag ani kalorii.
     (<b>{{ calibration_stats.learning.pct_entered if calibration_stats.learning.pct_entered is not none else "—" }}%</b>).</p>
   <p class="{{ 'warn' if calibration_stats.reset_7 > 0 or calibration_stats.error_7 > 0 else 'muted' }}">
     Resety strażnika: {{ calibration_stats.reset_7 }} (7 dni) / {{ calibration_stats.reset_30 }} (30 dni).
-    Błędy catch_up: {{ calibration_stats.error_7 }} (7 dni) / {{ calibration_stats.error_30 }} (30 dni).</p>
+    Błędy catch_up: {{ calibration_stats.error_7 }} (7 dni) / {{ calibration_stats.error_30 }} (30 dni).
+    Dni pominięte jako niepełne (spożycie &lt; 40% wydatku): {{ calibration_stats.skip_partial_30 }} (30 dni).</p>
   <p class="muted" style="margin-top:6px">Szum wagi w populacji — mediana tygodniowa |innov_kg|:</p>
   {{ calibration_stats.chart_innov | safe }}
 </section>

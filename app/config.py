@@ -61,7 +61,22 @@ LLM_BACKEND = os.getenv("FIT_KRASNAL_LLM", "auto")
 VERTEX_PROJECT = os.getenv("FIT_KRASNAL_VERTEX_PROJECT")
 VERTEX_LOCATION = os.getenv("FIT_KRASNAL_VERTEX_LOCATION", "europe-west1")
 VISION_MODEL = os.getenv("FIT_KRASNAL_VISION_MODEL", "claude-opus-5")
-GEMINI_MODEL = os.getenv("FIT_KRASNAL_GEMINI_MODEL", "gemini-3.5-flash")
+
+# Kaskada modeli Gemini: flash (nowsze wersje najpierw) → flash-lite (dużo
+# skromniejszy model, ale wielokrotnie wyższy darmowy limit RPM/RPD) → pro
+# (najlepsza jakość, ale zwykle najciaśniejszy limit). Gdy dany model odpowie
+# błędem (limit, 503, nieznana nazwa), próbujemy następnego z listy — patrz
+# meal_vision._estimate_gemini. Lista wg `models.list` na aistudio.google.com
+# (brak wariantu "thinking" dla tego klucza — pominięty).
+GEMINI_MODELS = [
+    m.strip() for m in os.getenv(
+        "FIT_KRASNAL_GEMINI_MODELS",
+        "gemini-3.8-flash,gemini-3.7-flash,gemini-3.6-flash,gemini-3.5-flash,"
+        "gemini-3-flash-preview,gemini-2.5-flash,"
+        "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-2.5-flash-lite,"
+        "gemini-3.1-pro-preview,gemini-2.5-pro",
+    ).split(",") if m.strip()
+]
 
 # Limit zdjęcia posiłku; middleware odrzuca po Content-Length, endpoint czyta
 # najwyżej tyle+1 (Camera.getPhoto w powłoce daje ~200–400 kB, 8 MB to zapas).

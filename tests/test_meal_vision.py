@@ -93,6 +93,11 @@ def test_vertex_client_built_with_adc_and_no_key(monkeypatch):
     captured = {}
 
     class FakeGenai:
+        class types:
+            @staticmethod
+            def HttpOptions(**kw):
+                return ("http_options", kw)
+
         @staticmethod
         def Client(**kw):
             captured.update(kw)
@@ -102,7 +107,35 @@ def test_vertex_client_built_with_adc_and_no_key(monkeypatch):
     monkeypatch.setitem(sys.modules, "google.genai", FakeGenai)
     monkeypatch.setattr(sys.modules["google"], "genai", FakeGenai, raising=False)
     assert meal_vision.gemini_client("vertex") == "client"
-    assert captured == {"vertexai": True, "project": "proj-test", "location": "europe-west1"}
+    assert captured == {
+        "vertexai": True, "project": "proj-test", "location": "europe-west1",
+        # per-model timeout z upstreamu obowiązuje też na ścieżce ADC
+        "http_options": ("http_options", {"timeout": meal_vision.PER_MODEL_TIMEOUT_S * 1000}),
+    }
+
+
+def test_forced_vertex_without_project_is_not_configured(monkeypatch):
+    _vertex_env(monkeypatch, project=None)
+    monkeypatch.setattr(meal_vision, "LLM_BACKEND", "vertex")
+    assert meal_vision.pick_backend(None, None) == "vertex"
+    assert meal_vision.llm_configured(None, None) is False   # trafia do kolejki jako no_key
+    assert meal_vision.classify_error(meal_vision.MealVisionNotConfigured("x")) == "no_key"
+
+
+def test_estimate_gemini_without_client_resolves_vertex_via_pick_backend(monkeypatch):
+    _vertex_env(monkeypatch)
+    monkeypatch.setenv("GEMINI_API_KEY", "env-key")       # klucz w env nie może wygrać z projektem
+    seen = {}
+    est = MealEstimate(description="x", items=[_item()], assumptions=[], kcal_min=1, kcal_max=2)
+
+    def fake_client(backend, key=None):
+        seen["backend"] = backend
+        return _FakeClient(est)
+
+    monkeypatch.setattr(meal_vision, "gemini_client", fake_client)
+    out, _model = meal_vision._estimate_gemini("x")
+    assert out is est
+    assert seen["backend"] == "vertex"
 
 
 def test_estimate_from_text_uses_injected_fake_client(monkeypatch):
@@ -111,8 +144,9 @@ def test_estimate_from_text_uses_injected_fake_client(monkeypatch):
                        kcal_min=80, kcal_max=100)
     fake = _FakeClient(est)
     monkeypatch.setattr(meal_vision, "gemini_client", lambda backend, key=None: fake)
-    out = meal_vision.estimate_from_text("jajko sadzone")
+    out, model = meal_vision.estimate_from_text("jajko sadzone")
     assert out is est
+    assert model == meal_vision.GEMINI_MODELS[0]
     call = fake.models.calls[0]
-    assert call["model"] == meal_vision.GEMINI_MODEL
+    assert call["model"] == meal_vision.GEMINI_MODELS[0]
     assert "jajko sadzone" in call["contents"][-1]
