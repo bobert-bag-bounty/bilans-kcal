@@ -10,19 +10,19 @@ projektu, numery seryjne, e-maile); te leżą w `deploy/terraform/*.tfvars`,
 
 ## A. Przed pierwszym `git push` (fork)
 
-- [ ] **GitHub Actions wyłączone na forku.** *Settings → Actions → General →
+- [x] **GitHub Actions wyłączone na forku** (2026-10-08; job `deploy` dodatkowo ograniczony do repo upstreamu). *Settings → Actions → General →
   Disable actions.* Workflow `deploy.yml` z upstreamu i tak nie dosięgnie VM
   (port 22 tylko z zakresu IAP, fork nie ma sekretów), ale każdy push
   robiłby czerwony przebieg i pełną suitę na runnerze GitHuba.
-- [ ] **Pełna suita `pytest` lokalnie** (za zgodą właściciela, CLAUDE.md).
+- [x] **Pełna suita `pytest` lokalnie** (248 passed, 2026-10-08) (za zgodą właściciela, CLAUDE.md).
   Dotąd przeszły tylko testy dotkniętych plików (66). Czerwony = nie pushuj.
-- [ ] **Audyt treści** zrobiony 2026-10-07: brak adresów, hostów, ID projektu,
+- [x] **Audyt treści** zrobiony 2026-10-07 i powtórzony przez osobnego agenta 2026-10-08 przed pushem (0 blokerów, poprawki w 25.6.1): brak adresów, hostów, ID projektu,
   e-maili, numeru seryjnego, ścieżek domowych; brak keystore, `.env`,
   `tfstate`; każdy commit z `app/` podnosi `VERSION`. Powtórzyć
   `git grep` po dopisaniu czegokolwiek nowego przed pushem.
-- [ ] **`git status` czysty, `main` ahead N / behind 0** względem `origin`
+- [x] **`git status` czysty, `main` ahead N / behind 0** (push 2026-10-08) względem `origin`
   (`git fetch` przed sprawdzeniem). Pushuje właściciel.
-- [ ] **Po pushu:** na VM `bash /opt/fit-krasnal/deploy/deploy.sh` przez IAP
+- [x] **Po pushu:** na VM `bash /opt/fit-krasnal/deploy/deploy.sh` przez IAP
   SSH, żeby maszyna wróciła na `origin/main` (dziś ma kod wgrany tar-em na
   stary commit). Potem `terraform plan` → „No changes".
 
@@ -30,15 +30,15 @@ projektu, numery seryjne, e-maile); te leżą w `deploy/terraform/*.tfvars`,
 
 | # | Co | Stan | Koszt | Uwagi |
 |---|---|---|---|---|
-| 1 | **Klient OAuth 2.0** (Web application, redirect `<PUBLIC_URL>/auth/google/callback`) i wpis `FIT_KRASNAL_GOOGLE_CLIENT_ID/_SECRET` do `/etc/fit-krasnal/env` + restart | brak; `/auth/google` → 503, nikt nie może się zalogować | 10 min, tylko GUI konsoli | Blokuje każdy test end-to-end poniżej |
-| 2 | **Zdjęcie z aparatu → oszacowanie przez Vertex** | niezweryfikowane (lokalnie bez klucza, na VM bez logowania) | 15 min po #1 | Sprawdzić też zdarzenia `photo_native_camera`, `native_app_open` na `/usage` |
-| 3 | **Health Connect: waga** | `android-app/README.md` i manifest deklarują `READ_WEIGHT`, `mobile.html` czyta tylko kroki | ~1 h kodu (ten sam wzorzec co kroki → istniejący POST wagi) **albo** 5 min: usunąć obietnicę z README i manifestu | Decyzja: zrobić czy wyciąć. Rekomendacja: wyciąć, autor i tak wybierze stos (Flutter vs Capacitor) |
-| 4 | **`deploy/README.md` §2 „Klucz SSH dla GitHub Actions"** | sprzeczne z wariantem Terraform (22 tylko z IAP) | 20 min doc | Dopisać: w wariancie Terraform deploy ręczny `gcloud compute ssh … --tunnel-through-iap --command 'bash /opt/fit-krasnal/deploy/deploy.sh'`; otwarcie 22 dla GitHuba = świadoma decyzja, nie domyślna |
-| 5 | **`CLAUDE.md` „Struktura repo"** | nie zna `app/middleware.py`, `app/routers/oidc.py`, backendu `vertex`, `android-app/`, `deploy/terraform/` | 30 min doc | Wchodzi w sekcję C, ale to minimum trzeba zrobić i tak |
-| 6 | **`.env.example`** | brak kilku zmiennych z `config.py` (m.in. `FIT_KRASNAL_STRAVA_*`, `_USAGE_SALT`, `_ADMIN_EMAIL`, `_PRIVACY_VERSION`, modele) — luka jeszcze z upstreamu | 15 min doc | Dopisać z komentarzem, bez wartości |
-| 7 | **`TODO.md`** | „Aplikacja mobilna — Flutter (10/10)" i „Nazwa pakietu (1/10)" nie wiedzą o PoC Capacitora (`cc.krasnal.fit`) ani o przycisku Health Connect | 15 min doc | Dopisać odnośnik do `android-app/README.md`; **nie decydować za autora** Flutter vs Capacitor ani nazwy pakietu — tylko zanotować, że `cc.krasnal.fit` jest użyte w PoC i w APK testowym |
+| 1 | ✅ 2026-10-08 **Klient OAuth 2.0** (Web application, redirect `<PUBLIC_URL>/auth/google/callback`) i wpis `FIT_KRASNAL_GOOGLE_CLIENT_ID/_SECRET` do `/etc/fit-krasnal/env` + restart | brak; `/auth/google` → 503, nikt nie może się zalogować | 10 min, tylko GUI konsoli | Blokuje każdy test end-to-end poniżej |
+| 2 | ✅ 2026-10-08 **Zdjęcie z aparatu → oszacowanie przez Vertex** | niezweryfikowane (lokalnie bez klucza, na VM bez logowania) | 15 min po #1 | Sprawdzić też zdarzenia `photo_native_camera`, `native_app_open` na `/usage` |
+| 3 | ⏸ scoping **Health Connect: waga** | `android-app/README.md` i manifest deklarują `READ_WEIGHT`, `mobile.html` czyta tylko kroki | ~1 h kodu (ten sam wzorzec co kroki → istniejący POST wagi) **albo** 5 min: usunąć obietnicę z README i manifestu | Decyzja: zrobić czy wyciąć. Rekomendacja: wyciąć, autor i tak wybierze stos (Flutter vs Capacitor) |
+| 4 | ✅ **`deploy/README.md` §2 „Klucz SSH dla GitHub Actions"** | sprzeczne z wariantem Terraform (22 tylko z IAP) | 20 min doc | Dopisać: w wariancie Terraform deploy ręczny `gcloud compute ssh … --tunnel-through-iap --command 'bash /opt/fit-krasnal/deploy/deploy.sh'`; otwarcie 22 dla GitHuba = świadoma decyzja, nie domyślna |
+| 5 | ✅ **`CLAUDE.md` „Struktura repo"** | nie zna `app/middleware.py`, `app/routers/oidc.py`, backendu `vertex`, `android-app/`, `deploy/terraform/` | 30 min doc | Wchodzi w sekcję C, ale to minimum trzeba zrobić i tak |
+| 6 | ✅ **`.env.example`** | brak kilku zmiennych z `config.py` (m.in. `FIT_KRASNAL_STRAVA_*`, `_USAGE_SALT`, `_ADMIN_EMAIL`, `_PRIVACY_VERSION`, modele) — luka jeszcze z upstreamu | 15 min doc | Dopisać z komentarzem, bez wartości |
+| 7 | ✅ **`TODO.md`** | „Aplikacja mobilna — Flutter (10/10)" i „Nazwa pakietu (1/10)" nie wiedzą o PoC Capacitora (`cc.krasnal.fit`) ani o przycisku Health Connect | 15 min doc | Dopisać odnośnik do `android-app/README.md`; **nie decydować za autora** Flutter vs Capacitor ani nazwy pakietu — tylko zanotować, że `cc.krasnal.fit` jest użyte w PoC i w APK testowym |
 | 8 | **VM: 6 oczekujące aktualizacje apt** | unattended-upgrades robi tylko security | 5 min | `sudo apt upgrade` + ewentualny reboot przez IAP |
-| 9 | **APK w buckecie** | build debug, URL sslip wszyty na stałe | 0 teraz | Ważny, dopóki IP się nie zmieni. Przy zmianie domeny (sekcja D) przebudować i wgrać ponownie |
+| 9 | ✅ **APK w buckecie** | build debug, URL sslip wszyty na stałe | 0 teraz | Ważny, dopóki IP się nie zmieni. Przy zmianie domeny (sekcja D) przebudować i wgrać ponownie |
 
 Nie domykać tutaj: punkty z `TODO.md` (reset hasła, usuwanie konta, Flutter)
 — to roadmapa autora, nie resztki forka.
