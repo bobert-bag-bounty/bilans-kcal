@@ -26,6 +26,10 @@ CSRF, limit zdjęcia) działa zawsze, bez flagi; do tego powłoka Android
 „co czyta co": [ARCHITEKTURA.md](ARCHITEKTURA.md); wdrożenie GCP:
 [deploy/README.md](deploy/README.md); powłoka: [android-app/README.md](android-app/README.md).
 
+Rzeczy forka ponad upstream (powłoka Android, logowanie Google, Vertex AI,
+utwardzenie, Terraform) zbudował [pepsi133](https://github.com/pepsi133)
+(rzeglen@gmail.com) — podziękowanie, bez żadnych praw czy roszczeń.
+
 ## Architektura (MVP)
 
 - **Python 3.12 + FastAPI**, SQLite, server-rendered dashboard (Jinja2)

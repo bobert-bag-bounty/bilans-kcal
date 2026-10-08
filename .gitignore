@@ -55,3 +55,7 @@ android-app/android/local.properties
 android-app/android/app/src/main/assets/public/
 android-app/android/app/src/main/assets/capacitor.config.json
 android-app/android/app/src/main/assets/capacitor.plugins.json
+*.jks
+*.keystore
+*.p12
+keystore.properties

@@ -26,7 +26,6 @@ variable "allowed_emails" {
 variable "apk_bucket_name" {
   description = "Nazwa bucketu GCS na plik APK (globalnie unikalna). Prywatny; dostęp przez storage.cloud.google.com po zalogowaniu."
   type        = string
-  default     = "fit-krasnal-apk"
 }
 
 variable "apk_viewers" {

@@ -45,7 +45,7 @@
   <a class="nav" href="/">← Wróć do aplikacji</a></header>
 <main>
 
-<p class="muted">Wersja noty: <code>{{ privacy_version if privacy_version else "2026-09-03" }}</code></p>
+<p class="muted">Wersja noty: <code>{{ privacy_version }}</code></p>
 
 <p>Fit Krasnal jest pilotażową aplikacją do liczenia bilansu kalorycznego,
 prowadzoną przez jedną osobę dla grupy kilkunastu testero-znajomych. Ta
@@ -107,7 +107,7 @@ przez konto administratora. Co ważne dla oceny ryzyka:</p>
 <ul>
   <li><b>Anthropic (Claude):</b> zgodnie z warunkami handlowymi API,
     Anthropic nie trenuje modeli na danych klientów przesłanych przez API
-    (sprawdzone {{ privacy_version if privacy_version else "2026-09-03" }}
+    (sprawdzone {{ privacy_version }}
     na podstawie <a href="https://www.anthropic.com/legal/commercial-terms" target="_blank">warunków komercyjnych Anthropic</a>).</li>
   <li><b>Google Gemini API — płatny poziom:</b> Google nie używa promptów
     ani odpowiedzi do ulepszania swoich produktów (czyli też do trenowania).</li>
@@ -118,14 +118,15 @@ przez konto administratora. Co ważne dla oceny ryzyka:</p>
     Szwajcarii i Wielkiej Brytanii (czyli m.in. w Polsce) obowiązują te
     same zasady jak na poziomie płatnym, również na darmowym kluczu —
     dane nie są używane do trenowania (sprawdzone
-    {{ privacy_version if privacy_version else "2026-09-03" }} na podstawie
+    {{ privacy_version }} na podstawie
     <a href="https://ai.google.dev/gemini-api/terms" target="_blank">warunków API Gemini</a>).
     Jeżeli korzystasz z aplikacji spoza tego regionu, sprawdź te warunki
     dla swojej lokalizacji.</li>
 </ul>
 <p><b>Wariant „Vertex AI" (tylko jeśli operator instancji go włączył):</b>
 zamiast Twojego klucza zdjęcia i opisy posiłków idą do modelu Gemini przez
-<b>Google Cloud Vertex AI</b> z konta serwera, w regionie w Unii Europejskiej.
+<b>Google Cloud Vertex AI</b> z konta serwera, w regionie wybranym przez operatora instancji (domyślnie
+w Unii Europejskiej; przy endpoincie <code>global</code> Google nie gwarantuje regionu).
 Google Cloud przetwarza je jako podwykonawca operatora i zgodnie z warunkami
 Vertex AI nie używa ich do trenowania modeli. W Ustawieniach zobaczysz wtedy
 informację „Szacowanie działa przez konto serwera (Vertex AI)" zamiast pola

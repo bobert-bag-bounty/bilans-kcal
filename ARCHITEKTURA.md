@@ -23,16 +23,16 @@ cztery middleware z `app/middleware.py` + `TrustedHost` (tę samą funkcję woł
 
 ```mermaid
 flowchart TD
-    client["Klient: przeglądarka / WebView Capacitor"] --> caddy[Caddy: HTTPS, reverse_proxy 127.0.0.1:8321]
-    caddy --> th[TrustedHostMiddleware<br/>FIT_KRASNAL_ALLOWED_HOSTS]
-    th --> sh[SecurityHeadersMiddleware<br/>CSP, HSTS, nagłówki]
-    sh --> so[SameOriginMiddleware<br/>CSRF po Sec-Fetch-Site / Origin]
+    client["Klient: przeglądarka / WebView Capacitor"] --> caddy["Caddy: HTTPS, reverse_proxy 127.0.0.1:8321"]
+    caddy --> th["TrustedHostMiddleware<br/>FIT_KRASNAL_ALLOWED_HOSTS"]
+    th --> sh["SecurityHeadersMiddleware<br/>CSP, HSTS, nagłówki"]
+    sh --> so["SameOriginMiddleware<br/>CSRF po Sec-Fetch-Site / Origin"]
     so --> bl["BodyLimitMiddleware<br/>413 dla /api/meals/photo ponad 8 MB"]
-    bl --> sess[SessionMiddleware<br/>podpisane ciasteczko, SameSite=Lax]
-    sess --> router[router app/routers/*]
+    bl --> sess["SessionMiddleware<br/>podpisane ciasteczko, SameSite=Lax"]
+    sess --> router["router app/routers/*"]
     router --> auth{{"auth.current_user<br/>401 → handler → /login (HTML) lub 401 (/api/*)"}}
-    router --> svc[service app/services/*<br/>wyjątek domenowy, nigdy HTTPException]
-    svc --> model[(app/models.py + SQLite<br/>każda tabela ma user_id)]
+    router --> svc["service app/services/*<br/>wyjątek domenowy, nigdy HTTPException"]
+    svc --> model[("app/models.py + SQLite<br/>każda tabela ma user_id")]
 ```
 
 Gdzie zapadają decyzje:
@@ -258,7 +258,7 @@ flowchart TD
     manual --> vm
     subgraph vm [VM e2-micro, Debian, Shielded + OS Login]
         caddy["Caddy: HTTPS Let's Encrypt"] --> uv[uvicorn 127.0.0.1:8321]
-        uv --- units[systemd: fit-krasnal.service + fit-krasnal-queue.timer/.service]
+        uv --- units["systemd: fit-krasnal.service + fit-krasnal-queue.timer/.service"]
         code["/opt/fit-krasnal — kod"] --- data["/var/lib/fit-krasnal — baza, zdjęcia"]
         env1["/etc/fit-krasnal/env — sekrety 640"]
         env2["/run/fit-krasnal/env — allowlista z metadanych VM"]

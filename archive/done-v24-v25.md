@@ -6,6 +6,25 @@ Pełne wpisy przeniesione z [DONE.md](../DONE.md), gdzie został indeks.
 
 ---
 
+## Infrastruktura forka na GCP + porządki po audycie przed publikacją (25.6.1)
+
+- **Terraform (`deploy/terraform/`):** API, konto usługi VM tylko z `aiplatform.user`
+  i `logging.logWriter` (bez kluczy), firewall 80/443 + SSH wyłącznie z zakresu IAP,
+  e2-micro Shielded z OS Login, statyczny IP, bucket APK (UBLA, blokada dostępu
+  publicznego, `objectViewer` per e-mail), sekret OAuth w Secret Manager z IAM dla SA.
+  Stan lokalny, tfvars i notatki obok konfiguracji, w `.gitignore`.
+- **Konfiguracja z GCP, nie z dysku:** allowlista logowania w metadanych VM
+  (`deploy/fetch-metadata-env.sh` jako `ExecStartPre`), klient OAuth ładowany
+  `deploy/load-oauth-secret.sh`. `setup-vm.sh` sparametryzowany (`FIT_DOMAIN`,
+  `FIT_REPO_URL` — pusty zostawia istniejący origin), jawne domyślne
+  `FIT_KRASNAL_LLM=auto` i `FIT_KRASNAL_VERTEX_LOCATION=global` zamiast pustych.
+- **Vertex:** `gemini-3.5-flash` nie istnieje w `europe-west1` (2026-10-08), działa
+  pod `global`; fork używa `global`. `/prywatnosc`: region „wybrany przez operatora
+  (domyślnie UE)" zamiast twardego „w UE"; usunięty martwy fallback daty noty.
+- **Po audycie:** job `deploy` w workflow tylko dla repo upstreamu (forki: same
+  testy), `*.jks`/`*.keystore` w `.gitignore`, `apk_bucket_name` bez domyślnej
+  wartości, cudzysłowy w etykietach Mermaid, podziękowanie w README.
+
 ## Logowanie Google wewnątrz powłoki Android + klient OAuth w Secret Manager (25.6.0)
 
 - **Problem:** Capacitor otwierał `accounts.google.com` w zewnętrznej

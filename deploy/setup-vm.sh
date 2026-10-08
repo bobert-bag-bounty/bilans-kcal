@@ -8,7 +8,8 @@
 # Parametry (zmienne środowiskowe):
 #   FIT_DOMAIN        (wymagane) publiczna nazwa hosta; Caddy wystawi na nią
 #                     HTTPS (Let's Encrypt) i przekaże ruch do uvicorna.
-#   FIT_REPO_URL      repo do sklonowania (domyślnie fork bobert-bag-bounty).
+#   FIT_REPO_URL      repo do sklonowania; przy istniejącym checkoucie pusta
+#                     wartość zostawia dotychczasowy origin (świeży klon: upstream).
 #   FIT_BRANCH        gałąź (domyślnie main).
 #   FIT_ALLOWED_EMAILS, FIT_AUTH, FIT_LLM, FIT_VERTEX_PROJECT,
 #   FIT_VERTEX_LOCATION — opcjonalne; jeśli podane przy PIERWSZYM uruchomieniu,
@@ -20,7 +21,7 @@
 set -euo pipefail
 
 FIT_DOMAIN="${FIT_DOMAIN:?Ustaw FIT_DOMAIN=<publiczna nazwa hosta>}"
-REPO_URL="${FIT_REPO_URL:-https://github.com/bobert-bag-bounty/bilans-kcal.git}"
+REPO_URL="${FIT_REPO_URL:-}"   # pusty = istniejący origin, a przy świeżym klonie upstream
 BRANCH="${FIT_BRANCH:-main}"
 PY_VERSION="${FIT_PYTHON:-3.12}"
 APP_DIR="/opt/fit-krasnal"
@@ -58,13 +59,17 @@ mkdir -p "$DATA_DIR" "$(dirname "$ENV_FILE")" "$UV_PY_DIR"
 chown -R "$APP_USER:$APP_USER" "$DATA_DIR" "$UV_PY_DIR"
 chmod 750 "$DATA_DIR"
 
-echo "== kod ($REPO_URL, $BRANCH) =="
+echo "== kod (${REPO_URL:-istniejący origin}, $BRANCH) =="
 if [ -d "$APP_DIR/.git" ]; then
-  sudo -u "$APP_USER" git -C "$APP_DIR" remote set-url origin "$REPO_URL"
+  if [ -n "$REPO_URL" ]; then
+    sudo -u "$APP_USER" git -C "$APP_DIR" remote set-url origin "$REPO_URL"
+  fi
+  REPO_URL="$(sudo -u "$APP_USER" git -C "$APP_DIR" remote get-url origin)"
   sudo -u "$APP_USER" git -C "$APP_DIR" fetch --quiet origin "$BRANCH"
   sudo -u "$APP_USER" git -C "$APP_DIR" checkout --quiet "$BRANCH"
   sudo -u "$APP_USER" git -C "$APP_DIR" pull --ff-only --quiet origin "$BRANCH"
 else
+  REPO_URL="${REPO_URL:-https://github.com/mariuszwojciechowski/bilans-kcal.git}"
   git clone --quiet --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
   chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 fi

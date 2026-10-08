@@ -16,6 +16,7 @@ w komunikacie commita, nie tutaj.
 
 ## v24–v25 — [archive/done-v24-v25.md](archive/done-v24-v25.md)
 
+- Infrastruktura forka na GCP: Terraform (SA bez kluczy, SSH tylko IAP, bucket APK, sekret OAuth), allowlista z metadanych VM, Vertex pod endpointem `global`; nota prywatności o regionie wg operatora; porządki po audycie przed publikacją (25.6.1)
 - Logowanie Google wewnątrz powłoki Android (`accounts.google.com` w `allowNavigation`; pełny przepływ i zdjęcie→Vertex zweryfikowane na telefonie) + klient OAuth w Secret Manager z loaderem na VM (25.6.0)
 - Utwardzenie publicznych interfejsów: nagłówki + CSP, CSRF po origin, filtr Host, limit zdjęcia 8 MB (25.5.0)
 - Gemini przez Vertex AI z konta serwera (backend `vertex`, bez kluczy API) (25.4.0)
