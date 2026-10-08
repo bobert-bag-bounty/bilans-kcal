@@ -114,7 +114,7 @@ GARMINTOKENS=$DATA_DIR/garth
 
 # Publiczny adres i dozwolone hosty (Caddy terminuje TLS).
 FIT_KRASNAL_PUBLIC_URL=https://$FIT_DOMAIN
-FIT_KRASNAL_ALLOWED_HOSTS=$FIT_DOMAIN
+FIT_KRASNAL_ALLOWED_HOSTS=$FIT_DOMAIN,localhost,127.0.0.1   # localhost: health check deploy.sh
 
 # Logowanie: password | oidc (Google). Dla oidc uzupełnij CLIENT_ID/SECRET
 # (Console → APIs & Services → Credentials → OAuth client, typ Web application,
